@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="fr-fr" >
+<head>
+    
+        
+        
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <!--  Prevent admin panel being crawled by search engines -->
+    <meta name="robots" content="none, noarchive">
+
+    <title>Site d’administration | Gestion de stock</title>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="/static/vendor/fontawesome-free/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.min.js" integrity="sha512-L0Shl7nXXzIlBSUUPpxrokqq4ojqgZFQczTYlGjzONGTDAcLremjwaWv5A+EDLnxhQzY5xUZPWLOLqYRkY0Cbw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <!-- Bootstrap and adminLTE -->
+    <link rel="stylesheet" href="/static/vendor/adminlte/css/adminlte.min.css" id="adminlte-css">
+
+    <!-- Bootswatch theme -->
+    
+        <link rel="stylesheet" href="/static/vendor/bootswatch/flatly/bootstrap.min.css" id="jazzmin-theme" />
+    
+
+    
+
+    <!-- Custom fixes for django -->
+    <link rel="stylesheet" href="/static/jazzmin/css/main.css">
+
+    
+
+    <!-- favicons -->
+    <link rel="shortcut icon" href="/static/vendor/adminlte/img/AdminLTELogo.png" type="image/png">
+    <link rel="icon" href="/static/vendor/adminlte/img/AdminLTELogo.png" sizes="32x32" type="image/png">
+
+    
+    <!-- Google Font: Source Sans Pro -->
+    <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700" rel="stylesheet">
+    
+<style>
+        
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            width: 70%;
+            text-align: center;
+        }
+        
+        .header {
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        
+        .header p {
+            color: #666;
+            font-size: 16px;
+            margin: 0;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+            text-align: left;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+            font-size: 16px;
+        }
+        
+        .form-group select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            background-color: white;
+            color: #333;
+            transition: border-color 0.3s ease;
+            box-sizing: border-box;
+        }
+        
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .download-btn {
+            background: linear-gradient(135deg, #2C3E50 0%, #1ABC9C 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+        
+        .download-btn:active {
+            transform: translateY(0);
+        }
+        
+        .tab-container {
+            display: flex;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .tab {
+            flex: 1;
+            background: #f8f9fa;
+            border: none;
+            padding: 15px 20px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: #666;
+        }
+        
+        .tab:hover {
+            background: #e9ecef;
+        }
+        
+        .tab.active {
+            background: linear-gradient(135deg, #1ABC9C 0%, #2C3E50 100%);
+
+            color: white;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        
+        .info-box {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 25px;
+            text-align: left;
+        }
+        
+        .info-box h3 {
+            margin: 0 0 10px 0;
+            color: #495057;
+            font-size: 16px;
+        }
+        
+        .info-box ul {
+            margin: 0;
+            padding-left: 20px;
+            color: #6c757d;
+            font-size: 14px;
+        }
+        
+        .info-box li {
+            margin-bottom: 5px;
+        }
+        
+        .verification-section {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            max-width: 500px;
+            width: 95%;
+            margin: 30px auto 0;
+        }
+        
+        .section-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .section-header h2 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .section-header p {
+            color: #666;
+            font-size: 14px;
+            margin: 0;
+        }
+        
+        .file-input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px dashed #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            background-color: #f8f9fa;
+            color: #333;
+            transition: border-color 0.3s ease;
+            box-sizing: border-box;
+            cursor: pointer;
+        }
+        
+        .file-input:hover {
+            border-color: #667eea;
+            background-color: #f0f4ff;
+        }
+        
+        .verify-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        .verify-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(40, 167, 69, 0.3);
+        }
+        
+        .results-container {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        
+        .verification-results h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .alert {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+            border: 1px solid transparent;
+        }
+        
+        .alert-success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        
+        .alert-warning {
+            background-color: #fff3cd;
+            border-color: #ffeaa7;
+            color: #856404;
+        }
+        
+        .alert-error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        
+        .messages-container {
+            margin-top: 20px;
+        }
+    </style>
+     
+     
+</head>
+<body class="hold-transition sidebar-mini   dashboard accent-primary theme-flatly " data-admin-utc-offset="0">
+
+<div class="wrapper">
+
+        
+            
+
+            <aside class="main-sidebar elevation-4 sidebar-dark-primary" id="jazzy-sidebar">
+                <a href="/admin/" class="brand-link " id="jazzy-logo">
+                    <img src="/static/vendor/adminlte/img/AdminLTELogo.png" alt="Gestion de stock Logo" class="img-circle brand-image elevation-3" style="opacity: .8">
+                    <span class="brand-text font-weight-light">Gestion de Stock</span>
+                </a>
+
+                <div class="sidebar">
+                    <div class="user-panel mt-3 pb-3 mb-3 d-flex">
+                        <div class="image">
+                            
+                                <i class="fas fa-inverse user-profile fa-user-circle"></i>
+                            
+                        </div>
+                        <div class="info">
+                            
+                                <a href="/admin/auth/user/1/change/" class="d-block">admin</a>
+                            
+                        </div>
+                    </div>
+
+                    <nav class="mt-2">
+                        <ul class="nav nav-pills nav-sidebar flex-column " data-widget="treeview" role="menu" data-collapsible="false">
+
+                            <li class="nav-item">
+                                <a href="/admin/" class="nav-link">
+                                    <i class="nav-icon fas fa-th-large"></i>
+                                    <p>Tableau de bord</p>
+                                </a>
+                            </li>
+                            
+                                       <!--   -->
+                            <!-- Only show these sections if the user is not an employee -->
+                            <li class="nav-header" id="tables-de-bord-header">Google Sheets</li>
+
+                        <li class="nav-item" id="integration-item">
+                            <a href="/Integration_Google_Sheets/" style="display: flex; margin-left: 8%;">
+                                <i class="nav-icon fas fa-cogs"></i> <p>Traiter une Sheet</p>
+                            </a>
+                        </li>
+
+                        <li class="nav-item" id="telechargement-item">
+                            <a href="/Telechargement_Google_Sheets/" style="display: flex; justify-content: center;">
+                                <i class="nav-icon fas fa-download"></i> <p>Télécharger depuis Sheets</p>
+                            </a>
+                        </li>
+
+                        <!---->
+                                
+                               
+                            
+                                
+                               
+                            
+                            
+                                
+                               <li class="nav-header">Authentification et autorisation</li>
+                                    
+                                    
+                                        <li class="nav-item">
+                                            
+                                            <a href="/admin/auth/group/" class="nav-link">
+                                                <i class="nav-icon fas fa-users"></i> <p>Groupes</p>
+                                            </a>
+                                        
+                                        </li>
+                                    
+                                    
+                                        <li class="nav-item">
+                                            
+                                            <a href="/admin/auth/user/" class="nav-link">
+                                                <i class="nav-icon fas fa-user"></i> <p>Utilisateurs</p>
+                                            </a>
+                                        
+                                        </li>
+                                    
+                                
+                               <li class="nav-header">Gestion des Commandes</li>
+                                    
+                                    
+                                        <li class="nav-item">
+                                            
+                                            <a href="/admin/Orders/commande/" class="nav-link">
+                                                <i class="nav-icon fas fa-shopping-cart"></i> <p>Commandes</p>
+                                            </a>
+                                        
+                                        </li>
+                                    
+                                
+                               <li class="nav-header">Gestion des Produits</li>
+                                    
+                                    
+                                        <li class="nav-item">
+                                            
+                                            <a href="/admin/Products/boutique/" class="nav-link">
+                                                <i class="nav-icon fas fa-store-alt"></i> <p>Boutiques</p>
+                                            </a>
+                                        
+                                        </li>
+                                    
+                                    
+                                        <li class="nav-item">
+                                            
+                                            <a href="/admin/Products/couleur/" class="nav-link">
+                                                <i class="nav-icon fas fa-palette"></i> <p>Couleurs</p>
+                                            </a>
+                                        
+                                        </li>
+                                    
+                                    
+                                        <li class="nav-item">
+                                            
+                                            <a href="/admin/Products/produit/" class="nav-link">
+                                                <i class="nav-icon fas fa-box"></i> <p>Produits</p>
+                                            </a>
+                                        
+                                        </li>
+                                    
+                                    
+                                        <li class="nav-item">
+                                            
+                                            <a href="/admin/Products/taille/" class="nav-link">
+                                                <i class="nav-icon fas fa-ruler-combined"></i> <p>Tailles</p>
+                                            </a>
+                                        
+                                        </li>
+                                    
+                                    
+                                        <li class="nav-item">
+                                            
+                                            <a href="/admin/Products/variant/" class="nav-link">
+                                                <i class="nav-icon fas fa-cubes"></i> <p>Variants</p>
+                                            </a>
+                                        
+                                        </li>
+                                    
+                                
+                            
+                        </ul>
+                    </nav>
+                </div>
+            </aside>
+        
+        
+    
+
+    <div class="content-wrapper" >
+        
+            
+            <div class="content border-bottom mb-2">
+                <div class="container-fluid">
+                    <div class="row">
+                        <div class="col-12 col-md-auto d-flex flex-grow-1 align-items-center">
+                            <h1 class="h4 m-0 pr-3 mr-3 border-right">Intégration avec Google Sheets</h1>
+                            
+  
+
+                        </div>
+                        <div class="col-12 col-md-auto d-flex align-items-center justify-content-end page-actions">
+                        
+                        </div>
+                    
+                                    </div>
+                                </div>
+                            </div>
+                            
+    
+
+{% block content %}
+                          
+   <div class="container">
+        <div class="header">
+            <div class="icon">📊</div>
+            <h1>Téléchargement des données</h1>
+            <p>Téléchargez les données des variants et commandes dans une sheet</p>
+        </div>
+        
+        <div class="tab-container">
+            <button class="tab active" onclick="switchTab('variants')">
+                📦 Variants
+            </button>
+            <button class="tab" onclick="switchTab('commandes')">
+                🛒 Commandes
+            </button>
+        </div>
+        
+        <!-- Variants Tab Content -->
+        <div id="variants-content" class="tab-content active">
+            <div class="info-box" style="display: flex; flex-direction: column;">
+                <h3>Le fichier variants contiendra :</h3>
+                <ul>
+                    <li>ID du produit</li>
+                    <li>Nom du produit</li>
+                    <li>Prix du produit</li>
+                    <li>Quantité du variant</li>
+                    <li>Couleur</li>
+                    <li>Taille</li>
+                </ul>
+            </div>
+            
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action_type" value="download_variants">
+                <div class="form-group">
+                    <label for="boutique_id">Télécharger le sheet des produits de la boutique :</label>
+                    <select name="boutique_id" id="boutique_id" required>
+                        <option value="all" selected>Toutes les boutiques</option>
+                        {% for boutique in boutiques %}
+                            <option value="{{ boutique.id_boutique }}">{{ boutique.nom_boutique }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <button type="submit" class="download-btn">
+                    📥 Télécharger Variants
+                </button>
+            </form>
+        </div>
+        
+        <!-- Commandes Tab Content -->
+        <div id="commandes-content" class="tab-content">
+            <div class="info-box" style="display: flex; flex-direction: column;">
+                <h3>Le fichier commandes contiendra :</h3>
+                <ul>
+                    <li>ID de la commande</li>
+                    <li>Date de commande</li>
+                    <li>Produit commandé</li>
+                    <li>Quantité commandée</li>
+                    <li>État de la commande</li>
+                    <li>Nom du client</li>
+                    <li>Numéro du client</li>
+                    <li>Prix total (DZD)</li>
+                    <li>Type de livraison</li>
+                    <li>Adresse de livraison</li>
+                    <li>Wilaya</li>
+                    <li>Bureau</li>
+                </ul>
+            </div>
+            
+            <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action_type" value="download_commandes">
+
+            <div class="form-group">
+                <label for="etat_commande">Filtrer par état :</label>
+                <select name="etat_commande" id="etat_commande" required>
+                    <option value="all" selected>Tous les états</option>
+                    {% for value, display in etat_choices %}
+                        <option value="{{ value }}">{{ display }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="boutique_id">Filtrer par boutique :</label>
+                <select name="boutique_id" id="boutique_id" required>
+                    <option value="all" selected>Toutes les boutiques</option>
+                    {% for boutique in boutiques %}
+                        <option value="{{ boutique.id_boutique }}">{{ boutique.nom_boutique }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <button type="submit" class="download-btn">
+                📥 Télécharger Commandes
+            </button>
+        </form>
+
+        </div>
+        
+        <!-- Verification Section -->
+       
+        <script>
+            function switchTab(tabName) {
+                // Remove active class from all tabs and contents
+                document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                
+                // Add active class to clicked tab and corresponding content
+                event.target.classList.add('active');
+                document.getElementById(tabName + '-content').classList.add('active');
+            }
+        </script>
+    </div>
+
+{% endblock %}
+</div>
+</div>

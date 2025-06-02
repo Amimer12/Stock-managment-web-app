@@ -1,0 +1,10 @@
+python -m venv virtual_env
+virtual_env/Scripts/activate
+cd project_GS
+python manage.py runserver
+
+
+required packages:
+pip install django
+pip install xlsxwriter
+pip install pandas openpyxl
