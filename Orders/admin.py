@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import Commande
 from .forms import CommandeForm
-from Products.models import Variant
+from Products.models import Variant, Produit
 from Gestionnaires.models import Gestionnaire
 @admin.register(Commande)
 class CommandeAdmin(admin.ModelAdmin):
@@ -44,11 +44,10 @@ class CommandeAdmin(admin.ModelAdmin):
         user = request.user
         gestionnaire = Gestionnaire.objects.filter(user=user).first()
         if hasattr(user, 'groups') and user.groups.filter(name="Gestionnaire").exists():
-            # Get all boutiques for this gestionnaire
             boutiques = gestionnaire.boutique.all()
-            # Filter variants whose produit is in these boutiques
+            produits = Produit.objects.filter(boutiques__in=boutiques)
             form.base_fields['produit_commandé'].queryset = Variant.objects.filter(
-                produit__boutiques__in=boutiques
+                produit__in=produits
             ).distinct()
         return form
     

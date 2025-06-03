@@ -8,4 +8,5 @@ class ProduitForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['prix_produit'].label = 'Prix du produit (DZD)'
+        if 'prix_produit' in self.fields:
+            self.fields['prix_produit'].label = 'Prix du produit (DZD)'
