@@ -199,9 +199,18 @@ import os
 
 DATABASES = {
     'default': dj_database_url.config(
-        default='postgresql://neondb_owner:npg_NGSnu8Rq1HQr@ep-spring-rain-a85etcwt-pooler.eastus2.azure.neon.tech/neondb?sslmode=require'
+        default='postgresql://neondb_owner:npg_NGSnu8Rq1HQr@ep-spring-rain-a85etcwt-pooler.eastus2.azure.neon.tech/neondb?sslmode=require',
+        conn_max_age=600,
+        ssl_require=True,
+
     )
 }
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+    }
+}
+
 from django.contrib.auth import get_user_model
 
 if os.environ.get("DJANGO_SUPERUSER_USERNAME") and os.environ.get("RUN_MAIN"):
