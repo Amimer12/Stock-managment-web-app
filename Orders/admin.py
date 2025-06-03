@@ -45,7 +45,7 @@ class CommandeAdmin(admin.ModelAdmin):
         gestionnaire = Gestionnaire.objects.filter(user=user).first()
         if hasattr(user, 'groups') and user.groups.filter(name="Gestionnaire").exists():
             boutiques = gestionnaire.boutique.all()
-            produits = Produit.objects.filter(boutiques__in=boutiques)
+            produits = Produit.objects.filter(boutique__in=boutiques)
             form.base_fields['produit_commandé'].queryset = Variant.objects.filter(
                 produit__in=produits
             ).distinct()
