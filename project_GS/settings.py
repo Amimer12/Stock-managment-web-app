@@ -194,13 +194,24 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
+import dj_database_url
+import os
 
+DATABASES = {
+    'default': dj_database_url.config(
+        default='postgresql://neondb_owner:npg_NGSnu8Rq1HQr@ep-spring-rain-a85etcwt-pooler.eastus2.azure.neon.tech/neondb?sslmode=require'
+    )
+}
+from django.contrib.auth import get_user_model
+
+if os.environ.get("DJANGO_SUPERUSER_USERNAME") and os.environ.get("RUN_MAIN"):
+    User = get_user_model()
+    if not User.objects.filter(username=os.environ["DJANGO_SUPERUSER_USERNAME"]).exists():
+        User.objects.create_superuser(
+            username=os.environ["DJANGO_SUPERUSER_USERNAME"],
+            email=os.environ["DJANGO_SUPERUSER_EMAIL"],
+            password=os.environ["DJANGO_SUPERUSER_PASSWORD"]
+        )
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
