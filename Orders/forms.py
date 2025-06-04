@@ -59,7 +59,7 @@ class CommandeForm(forms.ModelForm):
         fields = '__all__'
         widgets = {
             'commune': forms.Select(),
-            'Adresse_livraison': forms.TextInput(attrs={'disabled': 'disabled'}),
+            'Adresse_livraison': forms.TextInput(),
         }
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

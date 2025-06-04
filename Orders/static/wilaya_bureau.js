@@ -1598,29 +1598,11 @@ window.addEventListener('DOMContentLoaded', function () {
     const adresseInput = document.getElementById('id_Adresse_livraison');
   console.log(wilayaSelect, communeSelect, typeLivraison, adresseInput);
     function updateLivraisonFields() {
-        if (!typeLivraison || !communeSelect || !adresseInput) return;
-
-        const type = typeLivraison.value.toLowerCase();
-
-        if (type === 'domicile') {
-            communeSelect.disabled = true;
-            communeSelect.value = ''; // clear selection
-            adresseInput.disabled = false;
-        } else if (type === 'bureau') {
-            adresseInput.disabled = true;
-            adresseInput.value = ''; // clear address
-            communeSelect.disabled = false;
-        } else {
-            communeSelect.disabled = true;
-            communeSelect.value = '';
-            adresseInput.disabled = true;
-            adresseInput.value = '';
-        }
-
-        // Force redraw (for some widgets or select2)
-        communeSelect.dispatchEvent(new Event('change'));
-        adresseInput.dispatchEvent(new Event('change'));
-    }
+    // Always keep both fields enabled and do not clear their values
+    if (!typeLivraison || !communeSelect || !adresseInput) return;
+    communeSelect.disabled = false;
+    adresseInput.disabled = false;
+}
 
     function updateCommunes() {
         const wilaya = wilayaSelect.value;

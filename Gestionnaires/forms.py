@@ -1,11 +1,10 @@
 from django import forms
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError
 from .models import Gestionnaire
 from Products.models import Boutique
 
 User = get_user_model()
-
-
 class GestionnaireCreationForm(forms.ModelForm):
     username = forms.CharField(label="Nom d'utilisateur")
     email = forms.EmailField(label="Email")
@@ -22,9 +21,17 @@ class GestionnaireCreationForm(forms.ModelForm):
         model = Gestionnaire
         fields = ("username", "email", "password1", "password2", "boutique")
 
+    def clean_username(self):
+        username = self.cleaned_data.get("username")
+        # Only validate for new instances, not updates
+        if not self.instance.pk and User.objects.filter(username=username).exists():
+            raise forms.ValidationError("Ce nom d'utilisateur est déjà utilisé.")
+        return username
+
     def clean_email(self):
         email = self.cleaned_data.get("email")
-        if User.objects.filter(email=email).exists():
+        # Only validate for new instances, not updates
+        if not self.instance.pk and User.objects.filter(email=email).exists():
             raise forms.ValidationError("Cet email est déjà utilisé.")
         return email
 
@@ -36,14 +43,15 @@ class GestionnaireCreationForm(forms.ModelForm):
         return password2
 
     def save(self, commit=True):
+        # Create or get the user
         user = User(
             username=self.cleaned_data["username"],
             email=self.cleaned_data["email"],
         )
         user.set_password(self.cleaned_data["password1"])
-        if commit:
-            user.save()
+        user.save()
 
+        # Assign group
         from django.contrib.auth.models import Group
         try:
             group = Group.objects.get(name="Gestionnaire")
@@ -51,13 +59,13 @@ class GestionnaireCreationForm(forms.ModelForm):
         except Group.DoesNotExist:
             pass
 
+        # Use the regular ModelForm save pattern
         gestionnaire = super().save(commit=False)
         gestionnaire.user = user
         if commit:
             gestionnaire.save()
-            self.save_m2m()
+            self.save_m2m()  # ✅ Now safe to call
         return gestionnaire
-
 
 class GestionnaireChangeForm(forms.ModelForm):
     username = forms.CharField(label="Nom d'utilisateur")

@@ -80,4 +80,8 @@ class Commande(models.Model):
 
     def __str__(self):
         return str(self.id_commande)
-
+    class Meta:
+        indexes = [
+                models.Index(fields=['date_commande', 'etat_commande']),
+                models.Index(fields=['produit_commandé', 'etat_commande']), 
+            ]
