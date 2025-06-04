@@ -72,13 +72,8 @@ WSGI_APPLICATION = 'project_GS.wsgi.application'
 DATABASES = {
     'default': dj_database_url.config(
         default='postgresql://neondb_owner:npg_NGSnu8Rq1HQr@ep-spring-rain-a85etcwt-pooler.eastus2.azure.neon.tech/neondb?sslmode=require',
-        conn_max_age=300,  # Reduced from 600 to avoid timeouts on free tier# Enable connection health checks
+        conn_max_age=300, 
         ssl_require=True,
-        # Add connection pooling settings
-        options={
-            'MAX_CONNS': 10,  # Limit connections for free tier
-            'MIN_CONNS': 1,
-        }
     )
 }
 
