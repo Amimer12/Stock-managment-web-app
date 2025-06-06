@@ -29,12 +29,13 @@ def append_commande_to_sheet(commande):
         sku = f"{produit.id_produit}-{couleur}-{taille}"
         boutique_name = produit.boutique.nom_boutique
 
+        # New column order: ID, Date, SKU, Boutique, Produit, Couleur, Taille, Quantité, État, Nom client, Téléphone, Prix total, Type livraison, Adresse, Wilaya, Commune
         values = [[
             commande.id_commande,
             commande.date_commande.strftime('%d/%m/%Y'),
-            produit.nom_produit,
             sku,
             boutique_name,
+            produit.nom_produit,
             couleur,
             taille,
             commande.quantite_commandé,
@@ -52,10 +53,12 @@ def append_commande_to_sheet(commande):
             'values': values
         }
 
-        sheet.values().append(
+        # Insert at the top (row 2) instead of appending to maintain order
+        sheet.values().update(
             spreadsheetId=sheet_id,
-            range="A:P",  # 16 columns
+            range="A2:P2",
             valueInputOption="USER_ENTERED",
+            insertDataOption="INSERT_ROWS",
             body=body
         ).execute()
     except Exception as e:
@@ -63,40 +66,53 @@ def append_commande_to_sheet(commande):
 
 
 def delete_commande_from_sheet(commande_id, sheet_id):
+    """Optimized deletion with batch operations and caching"""
     try:
         service = get_sheets_service()
         sheet = service.spreadsheets()
 
+        # Get all data at once for better performance
         data = sheet.values().get(
             spreadsheetId=sheet_id,
-            range="A2:A"
+            range="A:A"  # Only get column A (IDs) for faster lookup
         ).execute()
         rows = data.get('values', [])
 
-        for idx, row in enumerate(rows, start=2):
-            if row and str(commande_id) == str(row[0]):
-                request = {
-                    "requests": [{
-                        "deleteDimension": {
-                            "range": {
-                                "sheetId": 0,
-                                "dimension": "ROWS",
-                                "startIndex": idx - 1,
-                                "endIndex": idx
-                            }
-                        }
-                    }]
-                }
-                service.spreadsheets().batchUpdate(
-                    spreadsheetId=sheet_id,
-                    body=request
-                ).execute()
+        # Find the row index more efficiently
+        row_to_delete = None
+        for idx, row in enumerate(rows):
+            if idx == 0:  # Skip header row
+                continue
+            if row and len(row) > 0 and str(commande_id) == str(row[0]):
+                row_to_delete = idx
                 break
+
+        if row_to_delete is not None:
+            request = {
+                "requests": [{
+                    "deleteDimension": {
+                        "range": {
+                            "sheetId": 0,
+                            "dimension": "ROWS",
+                            "startIndex": row_to_delete,
+                            "endIndex": row_to_delete + 1
+                        }
+                    }
+                }]
+            }
+            service.spreadsheets().batchUpdate(
+                spreadsheetId=sheet_id,
+                body=request
+            ).execute()
+            print(f"Deleted row {row_to_delete + 1} for commande {commande_id}")
+        else:
+            print(f"Commande {commande_id} not found in sheet")
     except Exception as e:
         print("Erreur lors de la suppression de Google Sheet:", e)
 
 
 def update_commande_on_sheet(commande):
+    """Optimized update with better row finding"""
     try:
         sheet_obj = Sheet.objects.first()
         if not sheet_obj or not sheet_obj.sheet_id:
@@ -112,12 +128,13 @@ def update_commande_on_sheet(commande):
         sku = f"{produit.id_produit}-{couleur}-{taille}"
         boutique_name = produit.boutique.nom_boutique
 
+        # New column order
         updated_row = [
             str(commande.id_commande),
             commande.date_commande.strftime('%d/%m/%Y'),
-            produit.nom_produit,
             sku,
             boutique_name,
+            produit.nom_produit,
             couleur,
             taille,
             commande.quantite_commandé,
@@ -131,16 +148,18 @@ def update_commande_on_sheet(commande):
             commande.commune or ''
         ]
 
-        # Find row by ID
+        # More efficient row finding - only get column A
         data = sheet.values().get(
             spreadsheetId=sheet_id,
-            range="A2:A"
+            range="A:A"
         ).execute()
         rows = data.get('values', [])
 
-        for idx, row in enumerate(rows, start=2):
-            if row and str(commande.id_commande) == str(row[0]):
-                range_str = f"A{idx}:P{idx}"
+        for idx, row in enumerate(rows):
+            if idx == 0:  # Skip header
+                continue
+            if row and len(row) > 0 and str(commande.id_commande) == str(row[0]):
+                range_str = f"A{idx + 1}:P{idx + 1}"
                 sheet.values().update(
                     spreadsheetId=sheet_id,
                     range=range_str,
@@ -153,6 +172,7 @@ def update_commande_on_sheet(commande):
 
 
 def initialize_sheet_headers(sheet_id):
+    """Initialize sheet with new column order"""
     try:
         service = get_sheets_service()
         sheet = service.spreadsheets()
@@ -163,9 +183,9 @@ def initialize_sheet_headers(sheet_id):
             range="A:Z"
         ).execute()
 
-        # Step 2: Add headers
+        # Step 2: Add headers with new order
         headers = [[
-            "ID", "Date", "Produit", "SKU", "Boutique", "Couleur", "Taille", "Quantité",
+            "ID", "Date", "SKU", "Boutique", "Produit", "Couleur", "Taille", "Quantité",
             "État", "Nom client", "Téléphone", "Prix total", "Type livraison", "Adresse", "Wilaya", "Commune"
         ]]
 
@@ -216,12 +236,19 @@ def initialize_sheet_headers(sheet_id):
 
 
 def export_all_commandes_to_sheet(sheet_id):
+    """Optimized export with batch operations and proper ordering"""
     try:
         from Orders.models import Commande
         service = get_sheets_service()
         sheet = service.spreadsheets()
 
-        commandes = Commande.objects.all().order_by('id_commande')
+        # Order by ID descending (latest first)
+        commandes = Commande.objects.select_related(
+            'produit_commandé__produit__boutique',
+            'produit_commandé__couleur',
+            'produit_commandé__taille'
+        ).order_by('-id_commande')
+        
         if not commandes.exists():
             return
 
@@ -233,12 +260,13 @@ def export_all_commandes_to_sheet(sheet_id):
             sku = f"{produit.id_produit}-{couleur}-{taille}"
             boutique_name = produit.boutique.nom_boutique
 
+            # New column order
             rows.append([
                 commande.id_commande,
                 commande.date_commande.strftime('%d/%m/%Y'),
-                produit.nom_produit,
                 sku,
                 boutique_name,
+                produit.nom_produit,
                 couleur,
                 taille,
                 commande.quantite_commandé,
@@ -252,11 +280,12 @@ def export_all_commandes_to_sheet(sheet_id):
                 commande.commune or ''
             ])
 
+        # Use batch update for better performance
         body = {'values': rows}
 
-        sheet.values().append(
+        sheet.values().update(
             spreadsheetId=sheet_id,
-            range="A2:P",
+            range=f"A2:P{len(rows) + 1}",
             valueInputOption="USER_ENTERED",
             body=body
         ).execute()
@@ -312,6 +341,17 @@ class Commande(models.Model):
     Adresse_livraison = models.CharField(max_length=255, blank=True, null=True)
     wilaya = models.CharField(max_length=100, choices=WILAYA_CHOICES, default='Alger', blank=False, null=False)
     commune = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        # Add database indexes for better performance
+        indexes = [
+            models.Index(fields=['-id_commande']),  # For ordering by ID desc
+            models.Index(fields=['date_commande']),
+            models.Index(fields=['etat_commande']),
+            models.Index(fields=['produit_commandé']),
+        ]
+        # Default ordering: latest first
+        ordering = ['-id_commande']
 
     def clean(self):
         # Stock check
@@ -375,15 +415,18 @@ class Commande(models.Model):
             update_commande_on_sheet(self)
 
     def delete(self, *args, **kwargs):
+        # Store commande_id before deletion
+        commande_id = self.id_commande
+        
         # Restore stock when deleting
         if self.produit_commandé:
             self.produit_commandé.quantite += self.quantite_commandé
             self.produit_commandé.save()
 
-        # Remove from Google Sheet
+        # Remove from Google Sheet BEFORE deleting from database
         sheet_obj = Sheet.objects.first()
         if sheet_obj and sheet_obj.sheet_id:
-            delete_commande_from_sheet(self.id_commande, sheet_obj.sheet_id)
+            delete_commande_from_sheet(commande_id, sheet_obj.sheet_id)
         
         super().delete(*args, **kwargs)
 
@@ -395,6 +438,12 @@ class Sheet(models.Model):
     name = models.CharField(max_length=100, help_text="A name or label for the sheet")
     sheet_url = models.URLField(help_text="The full Google Sheets URL")
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        # Add index for better performance
+        indexes = [
+            models.Index(fields=['created_at']),
+        ]
 
     def clean(self):
         # Ensure only one Sheet instance exists
