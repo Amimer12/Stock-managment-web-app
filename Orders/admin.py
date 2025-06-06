@@ -71,4 +71,4 @@ class SheetAdmin(admin.ModelAdmin):
             'fields': ('created_at',)
         }),
     )
-    readonly_fields = ('created_at','name', 'sheet_url')
+    readonly_fields = ('created_at',)
