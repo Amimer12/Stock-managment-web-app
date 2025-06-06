@@ -60,5 +60,15 @@ from .models import Sheet
 
 @admin.register(Sheet)
 class SheetAdmin(admin.ModelAdmin):
-    list_display = ('name', 'sheet_url', 'created_at')
+    list_display = ('name', 'sheet_url')
     search_fields = ('name', 'sheet_url')
+    fieldsets = (
+        (None, {
+            'fields': ('name', 'sheet_url')
+        }),
+        ('Created At', {
+            'classes': ('collapse',),
+            'fields': ('created at',)
+        }),
+    )
+    readonly_fields = ('created at','sheet_url','name',)
