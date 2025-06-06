@@ -360,7 +360,16 @@ class Sheet(models.Model):
             initialize_sheet_headers(self.sheet_id)
             export_all_commandes_to_sheet(self.sheet_id)
 
+    def save(self, *args, **kwargs):
+        if not self.pk and Sheet.objects.exists():
+            raise ValidationError("Juste une Sheet est autorisée.")
+        super().save(*args, **kwargs)
+        if self.sheet_id:
+            initialize_sheet_headers(self.sheet_id)
 
+    def delete(self, *args, **kwargs):
+        raise ValidationError("La suppression de Sheet n'est pas autorisé.")
+    
     @property
     def sheet_id(self):
         import re
