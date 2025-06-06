@@ -11,8 +11,7 @@ class Produit(models.Model):
     prix_produit = models.DecimalField(max_digits=10, decimal_places=0, default=0)
     descreption_produit = models.TextField(blank=True)
     quantite_produit = models.IntegerField(blank=True, default=0)  
-    boutique = models.ForeignKey('Boutique', related_name='produits', on_delete=models.CASCADE, blank=True, null=True)
-
+    boutique = models.ForeignKey('Boutique', related_name='produits', on_delete=models.SET_NULL, blank=True, null=True)
     def __str__(self):
         return self.nom_produit
     
@@ -37,19 +36,21 @@ class Boutique(models.Model):
 
 class Variant(models.Model):
     id_variant = models.AutoField(primary_key=True)
-    produit = models.ForeignKey(Produit, related_name="produit_couleur_taille", on_delete=models.CASCADE)
-    couleur = models.ForeignKey(Couleur, related_name="produit_couleur_taille", on_delete=models.CASCADE)
-    taille = models.ForeignKey(Taille, related_name="produit_couleur_taille", on_delete=models.CASCADE)
+    produit = models.ForeignKey(Produit, related_name="produit_couleur_taille", on_delete=models.SET_NULL, null=True)
+    couleur = models.ForeignKey(Couleur, related_name="produit_couleur_taille", on_delete=models.SET_NULL, null=True)
+    taille = models.ForeignKey(Taille, related_name="produit_couleur_taille", on_delete=models.SET_NULL, null=True)
     quantite = models.IntegerField()
 
     class Meta:
         unique_together = ('produit', 'couleur', 'taille')
 
     def __str__(self):
+        if not self.produit or not self.couleur or not self.taille:
+            return "Variant Incomplet"
         return f"{self.produit.nom_produit} - {self.couleur.nom_couleur} - {self.taille.nom_taille}"
 
     def clean(self):
-        if self.quantite < 0:
+        if self and self.quantite and self.quantite < 0:
             raise ValidationError({'quantite': "La quantité ne peut pas etre négative."})
 
     def save(self, *args, **kwargs):
@@ -68,5 +69,4 @@ class Variant(models.Model):
         total = Variant.objects.filter(produit=produit).aggregate(models.Sum('quantite'))['quantite__sum'] or 0
         produit.quantite_produit = total
         produit.save(update_fields=['quantite_produit'])
-
 

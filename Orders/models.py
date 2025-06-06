@@ -6,6 +6,62 @@ from django.core.exceptions import ValidationError
 from decimal import Decimal
 import re
 
+# utils.py or models.py if preferred
+
+from Orders.google_sheets import get_sheets_service
+from datetime import datetime
+
+def append_commande_to_sheet(commande):
+    try:
+        sheet_obj = Sheet.objects.first()
+        if not sheet_obj:
+            return  # No sheet configured
+        sheet_id = sheet_obj.sheet_id
+        if not sheet_id:
+            return
+
+        service = get_sheets_service()
+        sheet = service.spreadsheets()
+        produit = commande.produit_commandé.produit
+
+        couleur = commande.produit_commandé.couleur.nom_couleur
+        taille = commande.produit_commandé.taille.nom_taille
+        sku = f"{produit.id_produit}-{couleur}-{taille}"
+        boutique_name = produit.boutique.nom_boutique
+
+        values = [[
+            commande.id_commande,
+            commande.date_commande.strftime('%d/%m/%Y'),
+            produit.nom_produit,
+            sku,
+            boutique_name,
+            couleur,
+            taille,
+            commande.quantite_commandé,
+            commande.etat_commande,
+            commande.nom_client,
+            commande.numero_client,
+            f"{float(commande.prix_total)} DZD",
+            commande.type_livraison,
+            commande.Adresse_livraison or '',
+            commande.wilaya,
+            commande.commune or ''
+        ]]
+
+        body = {
+            'values': values
+        }
+
+        sheet.values().append(
+            spreadsheetId=sheet_id,
+            range="A:P",  # 16 columns
+            valueInputOption="USER_ENTERED",
+            body=body
+        ).execute()
+    except Exception as e:
+        print("Erreur lors de l'ajout à Google Sheet:", e)
+
+
 WILAYA_CHOICES = [
     ('Adrar', 'Adrar'), ('Chlef', 'Chlef'), ('Laghouat', 'Laghouat'), ('Oum El Bouaghi', 'Oum El Bouaghi'),
     ('Batna', 'Batna'), ('Bejaia', 'Bejaia'), ('Biskra', 'Biskra'), ('Bechar', 'Bechar'),
@@ -28,7 +84,7 @@ WILAYA_CHOICES = [
 class Commande(models.Model):
     id_commande = models.AutoField(primary_key=True)
     date_commande = models.DateField(default=now)
-    produit_commandé = models.ForeignKey("Products.Variant", related_name="produit_commandé", on_delete=models.CASCADE)
+    produit_commandé = models.ForeignKey("Products.Variant", related_name="produit_commandé", on_delete=models.SET_NULL, null=True)
     quantite_commandé = models.IntegerField(default=1)
     etat_commande = models.CharField(
         max_length=30,
@@ -56,7 +112,7 @@ class Commande(models.Model):
     def clean(self):
         # Stock check
         variant = self.produit_commandé
-        if self.pk is None and self.quantite_commandé > variant.quantite:
+        if self.pk is None and variant and self.quantite_commandé > variant.quantite:
             raise ValidationError({
                 'quantite_commandé': f"Stock insuffisant pour ce produit (stock actuel: {variant.quantite})"
             })
@@ -73,15 +129,55 @@ class Commande(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         variant = self.produit_commandé
-        if self.pk is None:  # Only on creation
+        is_new = self.pk is None
+        if is_new:
             variant.quantite -= self.quantite_commandé
             variant.save()
+
         super().save(*args, **kwargs)
+
+        if is_new:
+            append_commande_to_sheet(self)
 
     def __str__(self):
         return str(self.id_commande)
-    class Meta:
-        indexes = [
-                models.Index(fields=['date_commande', 'etat_commande']),
-                models.Index(fields=['produit_commandé', 'etat_commande']), 
-            ]
+
+
+def initialize_sheet_headers(sheet_id):
+    service = get_sheets_service()
+    sheet = service.spreadsheets()
+
+    headers = [[
+        "ID", "Date", "Produit", "SKU", "Boutique", "Couleur", "Taille", "Quantité",
+        "État", "Nom client", "Téléphone", "Prix total", "Type livraison", "Adresse", "Wilaya", "Commune"
+    ]]
+
+    body = {'values': headers}
+
+    sheet.values().update(
+        spreadsheetId=sheet_id,
+        range="A1:P1",
+        valueInputOption="RAW",
+        body=body
+    ).execute()
+
+
+class Sheet(models.Model):
+    name = models.CharField(max_length=100, help_text="A name or label for the sheet")
+    sheet_url = models.URLField(help_text="The full Google Sheets URL")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        if is_new and self.sheet_id:
+            initialize_sheet_headers(self.sheet_id)
+
+    @property
+    def sheet_id(self):
+        import re
+        match = re.search(r"/d/([a-zA-Z0-9-_]+)", self.sheet_url)
+        return match.group(1) if match else None
+
