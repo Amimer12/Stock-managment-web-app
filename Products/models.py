@@ -7,7 +7,7 @@ from django.contrib.auth.models import AbstractUser
 
 class Produit(models.Model):
     id_produit = models.AutoField(primary_key=True)
-    ID = models.CharField(max_length=30, unique=True, blank=False, null=False)
+    ID = models.CharField(max_length=30, unique=True, blank=False, null=False,default='0000')
     nom_produit = models.CharField(max_length=30)
     prix_produit = models.DecimalField(max_digits=10, decimal_places=0, default=0)
     descreption_produit = models.TextField(blank=True)

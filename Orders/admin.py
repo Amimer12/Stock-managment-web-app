@@ -6,7 +6,7 @@ from Gestionnaires.models import Gestionnaire
 @admin.register(Commande)
 class CommandeAdmin(admin.ModelAdmin):
     form = CommandeForm
-    list_display = ('id_commande_display','date_commande', 'etat_commande', 'get_display_variant', 'type_livraison','prix_total_dzd',)
+    list_display = ('id_commande_display','date_commande', 'etat_commande', 'get_display_variant','prix_total_dzd',)
     search_fields = ('etat_commande', 'nom_client', 'numero_client', 'produit_commandé__produit__nom_produit')
     list_filter = ('etat_commande','date_commande', 'produit_commandé__produit','produit_commandé__couleur','produit_commandé__taille', 'type_livraison', 'wilaya')
     ordering = ('-date_commande',)
@@ -29,7 +29,7 @@ class CommandeAdmin(admin.ModelAdmin):
         
     ]
     def id_commande_display(self, obj):
-        return f"Cmd #{obj.id_commande}"
+        return f"#{obj.id_commande}"
     id_commande_display.short_description = 'ID Commande'
     def get_display_variant(self, obj):
         return f"{obj.produit_commandé.produit.nom_produit} - {obj.produit_commandé.couleur.nom_couleur} - {obj.produit_commandé.taille.nom_taille}"
