@@ -113,7 +113,7 @@ def download_integration_sheet(request, boutique_id=None):
     # Write data rows
     row = 1
     for variant in variants:
-        worksheet.write(row, 0, variant.produit.id_produit, cell_format)
+        worksheet.write(row, 0, variant.produit.ID, cell_format)
         worksheet.write(row, 1, variant.produit.nom_produit, cell_format)
         worksheet.write(row, 2, float(variant.produit.prix_produit), cell_format)
         worksheet.write(row, 3, variant.quantite, cell_format)
@@ -228,7 +228,7 @@ def download_commandes_sheet(request, etat_commande=None, boutique_id=None):
         produit = cmd.produit_commandé.produit
         couleur = cmd.produit_commandé.couleur.nom_couleur
         taille = cmd.produit_commandé.taille.nom_taille
-        sku = f"{produit.id_produit}-{couleur}-{taille}"
+        sku = f"{produit.ID}-{couleur}-{taille}"
         boutique_name = produit.boutique.nom_boutique
 
         worksheet.write(row, 0, cmd.id_commande, cell_format)

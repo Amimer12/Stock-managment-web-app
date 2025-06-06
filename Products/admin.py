@@ -7,14 +7,14 @@ from Gestionnaires.models import Gestionnaire
 @admin.register(Produit)
 class ProduitAdmin(admin.ModelAdmin):
     form = ProduitForm
-    list_display = ('nom_produit', 'prix_produit_dzd', 'quantite_produit','boutique',)
-    search_fields = ('nom_produit', 'categorie_produit','boutique__nom_boutique')
+    list_display = ('ID','nom_produit', 'prix_produit_dzd', 'quantite_produit','boutique',)
+    search_fields = ('ID','nom_produit', 'categorie_produit','boutique__nom_boutique')
     list_filter = ('boutique',)
     ordering = ('-id_produit',)
     fieldsets = [
         ('Details de produit', {
             'classes': ('',),
-            'fields': [ 'nom_produit', 'boutique','prix_produit', 'quantite_produit',]}),
+            'fields': [ 'ID','nom_produit', 'boutique','prix_produit', 'quantite_produit',]}),
     ]
     readonly_fields = ['quantite_produit']
 
@@ -83,10 +83,10 @@ from Products.models import Produit
 class ProduitInline(admin.TabularInline):
     model = Produit
     extra = 0  # Show one blank form for new entry
-    fields = ('nom_produit', 'prix_produit', 'quantite_produit')  # Only show selected fields
+    fields = ('ID','nom_produit', 'prix_produit', 'quantite_produit')  # Only show selected fields
     can_delete = False  # Remove the delete checkbox
     show_change_link = True  # Optional: link to full edit page
-    readonly_fields = ('nom_produit', 'prix_produit', 'quantite_produit')
+    readonly_fields = ('ID','nom_produit', 'prix_produit', 'quantite_produit')
     def has_add_permission(self, request, obj=None):
         return False  
 
@@ -114,6 +114,3 @@ class BoutiqueAdmin(admin.ModelAdmin):
     def nombre_produits(self, obj):
         return obj.produits.count()  
     nombre_produits.short_description = 'Nombres de Produits'
-
-
-    
