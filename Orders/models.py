@@ -128,25 +128,132 @@ class Commande(models.Model):
 
     def save(self, *args, **kwargs):
         self.full_clean()
-        variant = self.produit_commandé
         is_new = self.pk is None
+        variant = self.produit_commandé
+
         if is_new:
             variant.quantite -= self.quantite_commandé
             variant.save()
+        else:
+            old = Commande.objects.get(pk=self.pk)
+            if old.produit_commandé != self.produit_commandé or old.quantite_commandé != self.quantite_commandé:
+                variant.quantite += old.quantite_commandé
+                variant.quantite -= self.quantite_commandé
+                variant.save()
 
         super().save(*args, **kwargs)
 
+        # Sync with sheet
         if is_new:
             append_commande_to_sheet(self)
+        else:
+            update_commande_on_sheet(self)
+    
+    def delete(self, *args, **kwargs):
+        sheet_obj = Sheet.objects.first()
+        if sheet_obj and sheet_obj.sheet_id:
+            delete_commande_from_sheet(self.id_commande, sheet_obj.sheet_id)
+        super().delete(*args, **kwargs)
+
 
     def __str__(self):
         return str(self.id_commande)
+
+def delete_commande_from_sheet(commande_id, sheet_id):
+    try:
+        service = get_sheets_service()
+        sheet = service.spreadsheets()
+
+        data = sheet.values().get(
+            spreadsheetId=sheet_id,
+            range="A2:A"
+        ).execute()
+        rows = data.get('values', [])
+
+        for idx, row in enumerate(rows, start=2):
+            if str(commande_id) == row[0]:
+                request = {
+                    "requests": [{
+                        "deleteDimension": {
+                            "range": {
+                                "sheetId": 0,
+                                "dimension": "ROWS",
+                                "startIndex": idx - 1,
+                                "endIndex": idx
+                            }
+                        }
+                    }]
+                }
+                service.spreadsheets().batchUpdate(
+                    spreadsheetId=sheet_id,
+                    body=request
+                ).execute()
+                break
+    except Exception as e:
+        print("Erreur lors de la suppression de Google Sheet:", e)
+
+
+def update_commande_on_sheet(commande):
+    try:
+        sheet_obj = Sheet.objects.first()
+        if not sheet_obj or not sheet_obj.sheet_id:
+            return
+
+        sheet_id = sheet_obj.sheet_id
+        service = get_sheets_service()
+        sheet = service.spreadsheets()
+
+        produit = commande.produit_commandé.produit
+        couleur = commande.produit_commandé.couleur.nom_couleur
+        taille = commande.produit_commandé.taille.nom_taille
+        sku = f"{produit.id_produit}-{couleur}-{taille}"
+        boutique_name = produit.boutique.nom_boutique
+
+        updated_row = [
+            str(commande.id_commande),
+            commande.date_commande.strftime('%d/%m/%Y'),
+            produit.nom_produit,
+            sku,
+            boutique_name,
+            couleur,
+            taille,
+            commande.quantite_commandé,
+            commande.etat_commande,
+            commande.nom_client,
+            commande.numero_client,
+            f"{float(commande.prix_total)} DZD",
+            commande.type_livraison,
+            commande.Adresse_livraison or '',
+            commande.wilaya,
+            commande.commune or ''
+        ]
+
+        # Find row by ID
+        data = sheet.values().get(
+            spreadsheetId=sheet_id,
+            range="A2:A"
+        ).execute()
+        rows = data.get('values', [])
+
+        for idx, row in enumerate(rows, start=2):
+            if str(commande.id_commande) == row[0]:
+                range_str = f"A{idx}:P{idx}"
+                sheet.values().update(
+                    spreadsheetId=sheet_id,
+                    range=range_str,
+                    valueInputOption="USER_ENTERED",
+                    body={'values': [updated_row]}
+                ).execute()
+                break
+    except Exception as e:
+        print("Erreur de mise à jour Google Sheet:", e)
 
 
 def initialize_sheet_headers(sheet_id):
     service = get_sheets_service()
     sheet = service.spreadsheets()
 
+    # Step 1: Add headers
     headers = [[
         "ID", "Date", "Produit", "SKU", "Boutique", "Couleur", "Taille", "Quantité",
         "État", "Nom client", "Téléphone", "Prix total", "Type livraison", "Adresse", "Wilaya", "Commune"
@@ -158,6 +265,83 @@ def initialize_sheet_headers(sheet_id):
         spreadsheetId=sheet_id,
         range="A1:P1",
         valueInputOption="RAW",
+        body=body
+    ).execute()
+
+    # Step 2: Format the header row (bold + colored background)
+    requests = [{
+        "repeatCell": {
+            "range": {
+                "sheetId": 0,
+                "startRowIndex": 0,
+                "endRowIndex": 1
+            },
+            "cell": {
+                "userEnteredFormat": {
+                    "backgroundColor": {
+                        "red": 0.2,
+                        "green": 0.6,
+                        "blue": 0.86
+                    },
+                    "textFormat": {
+                        "bold": True,
+                        "foregroundColor": {
+                            "red": 1.0,
+                            "green": 1.0,
+                            "blue": 1.0
+                        }
+                    }
+                }
+            },
+            "fields": "userEnteredFormat(backgroundColor,textFormat)"
+        }
+    }]
+
+    service.spreadsheets().batchUpdate(
+        spreadsheetId=sheet_id,
+        body={"requests": requests}
+    ).execute()
+
+def export_all_commandes_to_sheet(sheet_id):
+    from Orders.models import Commande
+    service = get_sheets_service()
+    sheet = service.spreadsheets()
+
+    commandes = Commande.objects.all().order_by('id_commande')
+    rows = []
+
+    for commande in commandes:
+        produit = commande.produit_commandé.produit
+        couleur = commande.produit_commandé.couleur.nom_couleur
+        taille = commande.produit_commandé.taille.nom_taille
+        sku = f"{produit.id_produit}-{couleur}-{taille}"
+        boutique_name = produit.boutique.nom_boutique
+
+        rows.append([
+            commande.id_commande,
+            commande.date_commande.strftime('%d/%m/%Y'),
+            produit.nom_produit,
+            sku,
+            boutique_name,
+            couleur,
+            taille,
+            commande.quantite_commandé,
+            commande.etat_commande,
+            commande.nom_client,
+            commande.numero_client,
+            f"{float(commande.prix_total)} DZD",
+            commande.type_livraison,
+            commande.Adresse_livraison or '',
+            commande.wilaya,
+            commande.commune or ''
+        ])
+
+    body = {'values': rows}
+
+    sheet.values().append(
+        spreadsheetId=sheet_id,
+        range="A2:P",
+        valueInputOption="USER_ENTERED",
         body=body
     ).execute()
 
@@ -174,6 +358,8 @@ class Sheet(models.Model):
         super().save(*args, **kwargs)
         if is_new and self.sheet_id:
             initialize_sheet_headers(self.sheet_id)
+            export_all_commandes_to_sheet(self.sheet_id)
+
 
     @property
     def sheet_id(self):
