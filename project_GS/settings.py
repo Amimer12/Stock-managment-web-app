@@ -149,6 +149,7 @@ JAZZMIN_SETTINGS = {
         "Products.Variant": "fas fa-cubes",
         "Products.Boutique": "fas fa-store-alt",
         "Orders.Commande": "fas fa-shopping-cart",
+        "Orders.Sheet": "fas fa-table",
         "Gestionnaires.Gestionnaire": "fas fa-user-tie",
     },
     # Icons that are used when one is not manually specified
