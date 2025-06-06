@@ -66,9 +66,9 @@ class SheetAdmin(admin.ModelAdmin):
         (None, {
             'fields': ('name', 'sheet_url')
         }),
-        ('Created At', {
+        ('Created at', {
             'classes': ('collapse',),
-            'fields': ('created at',)
+            'fields': ('created_at',)
         }),
     )
-    readonly_fields = ('created at','sheet_url','name',)
+    readonly_fields = ('created_at','name', 'sheet_url')
