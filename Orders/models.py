@@ -53,36 +53,55 @@ def append_commande_to_sheet(commande):
             'values': values
         }
 
-        # Insert at the top (row 2) instead of appending to maintain order
+        # First, insert a new row at position 2 to maintain latest-first order
+        insert_request = {
+            "requests": [{
+                "insertDimension": {
+                    "range": {
+                        "sheetId": 0,
+                        "dimension": "ROWS",
+                        "startIndex": 1,  # Insert after header (row 2)
+                        "endIndex": 2
+                    },
+                    "inheritFromBefore": False
+                }
+            }]
+        }
+        
+        service.spreadsheets().batchUpdate(
+            spreadsheetId=sheet_id,
+            body=insert_request
+        ).execute()
+
+        # Then add the data to the new row
         sheet.values().update(
             spreadsheetId=sheet_id,
             range="A2:P2",
             valueInputOption="USER_ENTERED",
-            insertDataOption="INSERT_ROWS",
             body=body
         ).execute()
+        
+        print(f"Added commande {commande.id_commande} to sheet")
     except Exception as e:
-        print("Erreur lors de l'ajout à Google Sheet:", e)
+        print(f"Erreur lors de l'ajout à Google Sheet: {e}")
 
 
 def delete_commande_from_sheet(commande_id, sheet_id):
-    """Optimized deletion with batch operations and caching"""
+    """Delete commande from Google Sheet"""
     try:
         service = get_sheets_service()
         sheet = service.spreadsheets()
 
-        # Get all data at once for better performance
+        # Get all IDs from column A
         data = sheet.values().get(
             spreadsheetId=sheet_id,
-            range="A:A"  # Only get column A (IDs) for faster lookup
+            range="A2:A"  # Start from row 2 (skip header)
         ).execute()
         rows = data.get('values', [])
 
-        # Find the row index more efficiently
+        # Find the row with matching ID
         row_to_delete = None
-        for idx, row in enumerate(rows):
-            if idx == 0:  # Skip header row
-                continue
+        for idx, row in enumerate(rows, start=2):  # Start counting from row 2
             if row and len(row) > 0 and str(commande_id) == str(row[0]):
                 row_to_delete = idx
                 break
@@ -94,8 +113,8 @@ def delete_commande_from_sheet(commande_id, sheet_id):
                         "range": {
                             "sheetId": 0,
                             "dimension": "ROWS",
-                            "startIndex": row_to_delete,
-                            "endIndex": row_to_delete + 1
+                            "startIndex": row_to_delete - 1,  # Convert to 0-based index
+                            "endIndex": row_to_delete
                         }
                     }
                 }]
@@ -104,15 +123,15 @@ def delete_commande_from_sheet(commande_id, sheet_id):
                 spreadsheetId=sheet_id,
                 body=request
             ).execute()
-            print(f"Deleted row {row_to_delete + 1} for commande {commande_id}")
+            print(f"Successfully deleted commande {commande_id} from sheet (row {row_to_delete})")
         else:
             print(f"Commande {commande_id} not found in sheet")
     except Exception as e:
-        print("Erreur lors de la suppression de Google Sheet:", e)
+        print(f"Erreur lors de la suppression de Google Sheet: {e}")
 
 
 def update_commande_on_sheet(commande):
-    """Optimized update with better row finding"""
+    """Update commande in Google Sheet"""
     try:
         sheet_obj = Sheet.objects.first()
         if not sheet_obj or not sheet_obj.sheet_id:
@@ -148,27 +167,26 @@ def update_commande_on_sheet(commande):
             commande.commune or ''
         ]
 
-        # More efficient row finding - only get column A
+        # Get IDs from column A to find the row
         data = sheet.values().get(
             spreadsheetId=sheet_id,
-            range="A:A"
+            range="A2:A"  # Start from row 2 (skip header)
         ).execute()
         rows = data.get('values', [])
 
-        for idx, row in enumerate(rows):
-            if idx == 0:  # Skip header
-                continue
+        for idx, row in enumerate(rows, start=2):  # Start counting from row 2
             if row and len(row) > 0 and str(commande.id_commande) == str(row[0]):
-                range_str = f"A{idx + 1}:P{idx + 1}"
+                range_str = f"A{idx}:P{idx}"
                 sheet.values().update(
                     spreadsheetId=sheet_id,
                     range=range_str,
                     valueInputOption="USER_ENTERED",
                     body={'values': [updated_row]}
                 ).execute()
+                print(f"Updated commande {commande.id_commande} in sheet (row {idx})")
                 break
     except Exception as e:
-        print("Erreur de mise à jour Google Sheet:", e)
+        print(f"Erreur de mise à jour Google Sheet: {e}")
 
 
 def initialize_sheet_headers(sheet_id):
@@ -236,13 +254,13 @@ def initialize_sheet_headers(sheet_id):
 
 
 def export_all_commandes_to_sheet(sheet_id):
-    """Optimized export with batch operations and proper ordering"""
+    """Export all commandes to Google Sheet with proper ordering"""
     try:
         from Orders.models import Commande
         service = get_sheets_service()
         sheet = service.spreadsheets()
 
-        # Order by ID descending (latest first)
+        # Order by ID descending (latest first) with select_related for efficiency
         commandes = Commande.objects.select_related(
             'produit_commandé__produit__boutique',
             'produit_commandé__couleur',
@@ -280,17 +298,27 @@ def export_all_commandes_to_sheet(sheet_id):
                 commande.commune or ''
             ])
 
-        # Use batch update for better performance
-        body = {'values': rows}
+        # Clear existing data first (except headers)
+        if rows:
+            # Calculate the range to clear (from row 2 to the end)
+            clear_range = f"A2:P{len(rows) + 100}"  # Clear extra rows to ensure no old data remains
+            sheet.values().clear(
+                spreadsheetId=sheet_id,
+                range=clear_range
+            ).execute()
 
-        sheet.values().update(
-            spreadsheetId=sheet_id,
-            range=f"A2:P{len(rows) + 1}",
-            valueInputOption="USER_ENTERED",
-            body=body
-        ).execute()
+            # Use single batch update for better performance
+            body = {'values': rows}
+            sheet.values().update(
+                spreadsheetId=sheet_id,
+                range=f"A2:P{len(rows) + 1}",
+                valueInputOption="USER_ENTERED",
+                body=body
+            ).execute()
+            
+            print(f"Exported {len(rows)} commandes to sheet")
     except Exception as e:
-        print("Erreur lors de l'export des commandes:", e)
+        print(f"Erreur lors de l'export des commandes: {e}")
 
 
 WILAYA_CHOICES = [
