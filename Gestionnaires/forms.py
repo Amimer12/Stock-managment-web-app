@@ -43,14 +43,15 @@ class GestionnaireCreationForm(forms.ModelForm):
         return password2
 
     def save(self, commit=True):
+        # Create or get the user
         user = User(
             username=self.cleaned_data["username"],
             email=self.cleaned_data["email"],
-            is_staff=True,  # ✅ Set staff to True
+            is_staff=True,
         )
         user.set_password(self.cleaned_data["password1"])
         user.save()
-        
+
         # Assign group
         from django.contrib.auth.models import Group
         try:
@@ -59,21 +60,20 @@ class GestionnaireCreationForm(forms.ModelForm):
         except Group.DoesNotExist:
             pass
 
+        # Use the regular ModelForm save pattern
         gestionnaire = super().save(commit=False)
         gestionnaire.user = user
         if commit:
             gestionnaire.save()
-            self.save_m2m()
+            self.save_m2m()  # ✅ Now safe to call
         return gestionnaire
-
 
 class GestionnaireChangeForm(forms.ModelForm):
     username = forms.CharField(label="Nom d'utilisateur")
     email = forms.EmailField(label="Email")
     first_name = forms.CharField(label="Prénom", required=False)
     last_name = forms.CharField(label="Nom", required=False)
-    is_active = forms.BooleanField(label="Actif", required=False)
-    is_staff = forms.BooleanField(label="Staff", required=False)
+    is_staff = forms.BooleanField(label="Authorisé", required=False)
     boutique = forms.ModelMultipleChoiceField(
         queryset=Boutique.objects.all(),
         widget=forms.CheckboxSelectMultiple,
@@ -93,7 +93,6 @@ class GestionnaireChangeForm(forms.ModelForm):
             self.fields['email'].initial = user.email
             self.fields['first_name'].initial = user.first_name
             self.fields['last_name'].initial = user.last_name
-            self.fields['is_active'].initial = user.is_active
             self.fields['is_staff'].initial = user.is_staff
 
     def clean_email(self):
@@ -115,7 +114,6 @@ class GestionnaireChangeForm(forms.ModelForm):
         user.email = self.cleaned_data["email"]
         user.first_name = self.cleaned_data["first_name"]
         user.last_name = self.cleaned_data["last_name"]
-        user.is_active = self.cleaned_data["is_active"]
         user.is_staff = self.cleaned_data["is_staff"]
         user.save()
 

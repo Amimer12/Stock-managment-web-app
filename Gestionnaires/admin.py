@@ -16,16 +16,15 @@ class GestionnaireAdmin(admin.ModelAdmin):
         "get_is_staff", "boutique_list"  # ✅ Removed get_is_active
     )
     search_fields = ("user__username", "user__email", "user__first_name", "user__last_name")
-    list_filter = ("boutique", "user__is_active", "user__is_staff")
+    list_filter = ("boutique", "user__is_staff")
 
     
     def get_form(self, request, obj=None, **kwargs):
-        form = super().get_form(request, obj, **kwargs)
-        if obj is not None:
-            if 'is_staff' in form.base_fields:
-                form.base_fields['is_staff'].label = "Authentification aux compte"  # ✅ Renamed label
-        return form
-
+        if obj is None:
+            kwargs["form"] = self.add_form
+        else:
+            kwargs["form"] = self.form
+        return super().get_form(request, obj, **kwargs)
 
     def get_fieldsets(self, request, obj=None):
         if obj is None:
@@ -35,7 +34,7 @@ class GestionnaireAdmin(admin.ModelAdmin):
         else:
             return [
                 ("Informations utilisateur", {
-                    "fields": ("username", "email", "first_name", "last_name", "is_staff")  # ✅ Removed is_active
+                    "fields": ("username", "email", "first_name", "last_name", "is_staff")
                 }),
                 ("Boutiques", {
                     "fields": ("boutique",),
@@ -67,7 +66,7 @@ class GestionnaireAdmin(admin.ModelAdmin):
     def get_is_staff(self, obj):
         return obj.user.is_staff if obj.user else False
     get_is_staff.boolean = True
-    get_is_staff.short_description = "Staff"
+    get_is_staff.short_description = "Authorisé"
 
     def boutique_list(self, obj):
         return ", ".join([b.nom_boutique for b in obj.boutique.all()])
