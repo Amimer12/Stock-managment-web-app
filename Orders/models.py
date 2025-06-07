@@ -87,24 +87,21 @@ def append_commande_to_sheet(commande):
 
 
 def delete_commande_from_sheet(commande_id):
-    """Delete a commande from Google Sheet by ID and shift rows up."""
     try:
-        # Get the configured sheet
         sheet_obj = Sheet.objects.first()
         if not sheet_obj or not sheet_obj.sheet_id:
-            print("❌ Aucune feuille Google Sheet configurée.")
+            print("❌ Aucun identifiant de feuille configuré.")
             return
 
         spreadsheet_id = sheet_obj.sheet_id
         service = get_sheets_service()
 
-        # Use the first sheet in the spreadsheet
         spreadsheet = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
-        first_sheet = spreadsheet['sheets'][0]
-        sheet_id = first_sheet['properties']['sheetId']
-        sheet_title = first_sheet['properties']['title']
+        sheet = spreadsheet['sheets'][0]
+        sheet_id = sheet['properties']['sheetId']
+        sheet_title = sheet['properties']['title']
 
-        # Get column A values from row 2 down
+        # Read column A (IDs)
         result = service.spreadsheets().values().get(
             spreadsheetId=spreadsheet_id,
             range=f"{sheet_title}!A2:A"
@@ -113,38 +110,36 @@ def delete_commande_from_sheet(commande_id):
         rows = result.get("values", [])
         row_to_delete = None
 
-        for idx, row in enumerate(rows, start=2):  # Start from sheet row 2
-            if row and str(row[0]).strip() == str(commande_id).strip():
+        for idx, row in enumerate(rows, start=2):  # 2 = data starts after header
+            print(f"🔍 Checking row {idx}: {row}")
+            if row and str(row[0]).strip() == str(commande_id):
+                print(f"✅ Match found for commande ID {commande_id} at row {idx}")
                 row_to_delete = idx
                 break
 
-        if row_to_delete is not None:
-            # Prepare delete request
+        if row_to_delete:
             request_body = {
                 "requests": [{
                     "deleteDimension": {
                         "range": {
                             "sheetId": sheet_id,
                             "dimension": "ROWS",
-                            "startIndex": row_to_delete - 1,  # 0-indexed
+                            "startIndex": row_to_delete - 1,
                             "endIndex": row_to_delete
                         }
                     }
                 }]
             }
-
-            # Execute row deletion
             service.spreadsheets().batchUpdate(
                 spreadsheetId=spreadsheet_id,
                 body=request_body
             ).execute()
-
-            print(f"✅ Commande {commande_id} supprimée (ligne {row_to_delete})")
+            print(f"✅ Deleted commande {commande_id} from row {row_to_delete}")
         else:
-            print(f"⚠️ Commande ID {commande_id} non trouvée dans la feuille")
+            print(f"⚠️ Commande ID {commande_id} not found")
 
     except Exception as e:
-        print(f"❌ Erreur lors de la suppression de la commande {commande_id} : {e}")
+        print(f"❌ Erreur lors de la suppression: {e}")
 
 
 
