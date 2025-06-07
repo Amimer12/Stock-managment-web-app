@@ -85,94 +85,60 @@ def append_commande_to_sheet(commande):
     except Exception as e:
         print(f"Erreur lors de l'ajout à Google Sheet: {e}")
 
-import os
-import logging
-
-logger = logging.getLogger(__name__)
-fh = logging.FileHandler(os.path.join('/tmp', 'sheet_integration.log'))
-logger.addHandler(fh)
-logger.setLevel(logging.DEBUG)
-
-class SheetLog(models.Model):
-    timestamp = models.DateTimeField(auto_now_add=True)
-    action = models.CharField(max_length=50)
-    commande_id = models.IntegerField()
-    status = models.CharField(max_length=20)
-    message = models.TextField(null=True, blank=True)
 
 
 def delete_commande_from_sheet(commande_id):
     try:
         sheet_obj = Sheet.objects.first()
-        logger.debug(f"sheet_obj: {sheet_obj}")
-
-        if not sheet_obj or not sheet_obj.sheet_id:
-            logger.warning("No sheet configured")
-            SheetLog.objects.create(
-                action="delete", commande_id=commande_id,
-                status="no_sheet", message="sheet_obj missing or sheet_id empty"
-            )
+        if not sheet_obj:
+            print("No sheet configured.")
             return
 
-        spreadsheet_id = sheet_obj.sheet_id
-        logger.debug(f"spreadsheet_id: {spreadsheet_id}")
+        sheet_id = sheet_obj.sheet_id
+        if not sheet_id:
+            print("Sheet ID missing.")
+            return
+
         service = get_sheets_service()
+        sheet = service.spreadsheets()
 
-        spreadsheet = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
-        first_sheet = spreadsheet['sheets'][0]
-        sheet_title = first_sheet['properties']['title']
-        sheet_id = first_sheet['properties']['sheetId']
-        logger.debug(f"Using sheet_title={sheet_title}, sheetId={sheet_id}")
-
-        result = service.spreadsheets().values().get(
-            spreadsheetId=spreadsheet_id,
-            range=f"{sheet_title}!A2:A"
+        # Fetch all rows from the sheet
+        result = sheet.values().get(
+            spreadsheetId=sheet_id,
+            range="A2:A"  # Assuming ID is in column A, starting from row 2
         ).execute()
-        rows = result.get("values", [])
-        logger.debug(f"Rows fetched: {len(rows)}")
 
+        values = result.get('values', [])
         row_to_delete = None
-        for idx, row in enumerate(rows, start=2):
-            cell = str(row[0]).strip() if row else None
-            logger.debug(f"Row {idx}: cell='{cell}'")
-            if cell == str(commande_id):
+
+        for idx, row in enumerate(values, start=2):  # Start=2 to match actual row numbers
+            if row and str(row[0]) == str(commande_id):
                 row_to_delete = idx
                 break
 
-        if not row_to_delete:
-            logger.info(f"Commande ID {commande_id} not found")
-            SheetLog.objects.create(
-                action="delete", commande_id=commande_id,
-                status="not_found", message=f"{len(rows)} rows scanned"
-            )
-            return
-
-        request_body = { "requests": [{
-            "deleteDimension": {
-                "range": {
-                    "sheetId": sheet_id,
-                    "dimension": "ROWS",
-                    "startIndex": row_to_delete - 1,
-                    "endIndex": row_to_delete
-                }
+        if row_to_delete:
+            # Delete the matched row using deleteDimension
+            delete_request = {
+                "requests": [
+                    {
+                        "deleteDimension": {
+                            "range": {
+                                "sheetId": 0,  # usually the first sheet has ID 0
+                                "dimension": "ROWS",
+                                "startIndex": row_to_delete - 1,  # 0-based index
+                                "endIndex": row_to_delete
+                            }
+                        }
+                    }
+                ]
             }
-        }]}
-        logger.debug(f"Deleting row {row_to_delete}")
-        service.spreadsheets().batchUpdate(spreadsheetId=spreadsheet_id, body=request_body).execute()
-
-        logger.info(f"Deleted commande {commande_id} (row {row_to_delete})")
-        SheetLog.objects.create(
-            action="delete", commande_id=commande_id,
-            status="deleted", message=f"row {row_to_delete}"
-        )
+            sheet.batchUpdate(spreadsheetId=sheet_id, body=delete_request).execute()
+            print(f"Commande ID {commande_id} deleted from Google Sheet (row {row_to_delete}).")
+        else:
+            print(f"Commande ID {commande_id} not found in Google Sheet.")
 
     except Exception as e:
-        logger.error(f"Exception deleting commande {commande_id}: {e}", exc_info=True)
-        SheetLog.objects.create(
-            action="delete", commande_id=commande_id,
-            status="error", message=str(e)
-        )
-
+        print(f"Error while deleting from Google Sheet: {e}")
 
 
 def update_commande_on_sheet(commande):
@@ -501,7 +467,7 @@ class Commande(models.Model):
         try:
             delete_commande_from_sheet(commande_id)
         except Exception as e:
-            logger.error(f"delete_commande_from_sheet raised unexpected error: {e}", exc_info=True)
+            print(f"delete_commande_from_sheet raised unexpected error: {e}", exc_info=True)
 
 
         
