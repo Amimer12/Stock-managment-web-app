@@ -463,18 +463,18 @@ class Commande(models.Model):
             self.produit_commandé.save()
 
         # Remove from Google Sheet BEFORE deleting from database
-        sheet_obj = Sheet.objects.first()
         try:
-            delete_commande_from_sheet(commande_id)
+            success = delete_commande_from_sheet(commande_id)
+            if not success:
+                print(f"Warning: Could not delete commande {commande_id} from Google Sheet")
         except Exception as e:
-            print(f"delete_commande_from_sheet raised unexpected error: {e}", exc_info=True)
-
-
+            print(f"Error deleting from Google Sheet: {e}")
+            import traceback
+            traceback.print_exc()
+            # Continue with database deletion even if sheet deletion fails
         
+        # Delete from database
         super().delete(*args, **kwargs)
-
-    def __str__(self):
-        return str(self.id_commande)
 
 
 class Sheet(models.Model):
