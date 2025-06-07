@@ -44,17 +44,24 @@ def telechargement_sheet_view(request):
 def integration_sheet_view(request):
     if request.method == 'POST':
         return verify_commandes_sheet(request)
-    
+    nbr_enattente = '-'
+    nbr_livre = '-'
+    nbr_retour = '-'
     # Get all boutiques for the select dropdown
     boutiques = Boutique.objects.all().order_by('nom_boutique')
-    
+    nbr_retour = Commande.objects.filter(etat_commande='Retour').count()
+    nbr_livre = Commande.objects.filter(etat_commande='Livrée').count()
+    nbr_enattente = Commande.objects.filter(etat_commande='En attente').count()
     # Get command states for the select dropdown (excluding "all" option for verification)
     etat_choices = Commande._meta.get_field('etat_commande').choices
     
     return render(request, 'integration_sheet.html', {
         "boutiques": boutiques,
         "etat_choices": etat_choices,
-        "content": "This is the integration sheet page."
+        "content": "This is the integration sheet page.",
+        "nbr_retour": nbr_retour,
+        "nbr_livre": nbr_livre,
+        "nbr_enattente": nbr_enattente,
     })
 
 def download_integration_sheet(request, boutique_id=None):

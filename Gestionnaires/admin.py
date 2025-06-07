@@ -13,17 +13,19 @@ class GestionnaireAdmin(admin.ModelAdmin):
 
     list_display = (
         "get_username", "get_email", "get_first_name", "get_last_name",
-        "get_is_active", "get_is_staff", "boutique_list"
+        "get_is_staff", "boutique_list"  # ✅ Removed get_is_active
     )
     search_fields = ("user__username", "user__email", "user__first_name", "user__last_name")
     list_filter = ("boutique", "user__is_active", "user__is_staff")
 
+    
     def get_form(self, request, obj=None, **kwargs):
-        if obj is None:
-            kwargs["form"] = self.add_form
-        else:
-            kwargs["form"] = self.form
-        return super().get_form(request, obj, **kwargs)
+        form = super().get_form(request, obj, **kwargs)
+        if obj is not None:
+            if 'is_staff' in form.base_fields:
+                form.base_fields['is_staff'].label = "Authentification aux compte"  # ✅ Renamed label
+        return form
+
 
     def get_fieldsets(self, request, obj=None):
         if obj is None:
@@ -33,12 +35,13 @@ class GestionnaireAdmin(admin.ModelAdmin):
         else:
             return [
                 ("Informations utilisateur", {
-                    "fields": ("username", "email", "first_name", "last_name", "is_active", "is_staff")
+                    "fields": ("username", "email", "first_name", "last_name", "is_staff")  # ✅ Removed is_active
                 }),
                 ("Boutiques", {
                     "fields": ("boutique",),
                 }),
             ]
+
 
     def get_username(self, obj):
         return obj.user.username if obj.user else ""
@@ -76,16 +79,6 @@ class GestionnaireAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
 
-    def delete_model(self, request, obj):
-        user = obj.user
-        super().delete_model(request, obj)
-        if user:
-            user.delete()
-
-    def delete_queryset(self, request, queryset):
-        users = [obj.user for obj in queryset if obj.user]
-        super().delete_queryset(request, queryset)
-        User.objects.filter(pk__in=[user.pk for user in users if user]).delete()
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin

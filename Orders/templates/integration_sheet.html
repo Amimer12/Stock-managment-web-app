@@ -476,7 +476,31 @@
     
 
 {% block content %}
-                          
+
+<div class="container" style="max-width: 600px; margin: 40px auto;">
+    <div class="header" style="margin-bottom: 24px;">
+        <h1 style="font-style: italic; color: #1ABC9C; font-size: 2.2rem; letter-spacing: 1px;">Sommaire</h1>
+        <p style="color: #555; font-size: 1.1rem;">Visualisez les nombres des commandes par état.</p>
+    </div>
+    <div class="info-box" style="display: flex; justify-content: space-between; gap: 18px; background: #f4f8fb; border: none; box-shadow: 0 2px 12px rgba(44,62,80,0.07);">
+        <div style="flex:1; background: #fff; border-radius: 10px; padding: 18px 10px; display: flex; flex-direction: column; align-items: center; box-shadow: 0 1px 4px rgba(44,62,80,0.05);">
+            <span style="font-size: 2rem; color: #f1c40f;"><i class="fas fa-hourglass-half"></i></span>
+            <div style="font-weight: 600; color: #333; margin-top: 8px;">En attente</div>
+            <div style="font-size: 1.3rem; color: #f1c40f; margin-top: 4px;">{{ nbr_enattente }}</div>
+        </div>
+        <div style="flex:1; background: #fff; border-radius: 10px; padding: 18px 10px; display: flex; flex-direction: column; align-items: center; box-shadow: 0 1px 4px rgba(44,62,80,0.05);">
+            <span style="font-size: 2rem; color: #27ae60;"><i class="fas fa-check-circle"></i></span>
+            <div style="font-weight: 600; color: #333; margin-top: 8px;">Livré</div>
+            <div style="font-size: 1.3rem; color: #27ae60; margin-top: 4px;">{{ nbr_livre }}</div>
+        </div>
+        <div style="flex:1; background: #fff; border-radius: 10px; padding: 18px 10px; display: flex; flex-direction: column; align-items: center; box-shadow: 0 1px 4px rgba(44,62,80,0.05);">
+            <span style="font-size: 2rem; color: #e74c3c;"><i class="fas fa-undo-alt"></i></span>
+            <div style="font-weight: 600; color: #333; margin-top: 8px;">Retour</div>
+            <div style="font-size: 1.3rem; color: #e74c3c; margin-top: 4px;">{{ nbr_retour }}</div>
+        </div>
+    </div>
+</div> 
+
   <div class="container">
     <div class="section-header">
         

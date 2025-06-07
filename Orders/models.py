@@ -86,37 +86,38 @@ def append_commande_to_sheet(commande):
         print(f"Erreur lors de l'ajout à Google Sheet: {e}")
 
 
-def delete_commande_from_sheet(commande_id, spreadsheet_id, sheet_name="Sheet 1"):
-    """Delete commande from Google Sheet by ID"""
+def delete_commande_from_sheet(commande_id):
+    """Supprime une commande de la feuille Google Sheet en utilisant seulement l'ID de commande"""
     try:
+        sheet_obj = Sheet.objects.first()
+        if not sheet_obj or not sheet_obj.sheet_id:
+            print("❌ Aucun identifiant de feuille Google Sheet configuré.")
+            return
+
+        spreadsheet_id = sheet_obj.sheet_id
         service = get_sheets_service()
+
+        # Récupérer la feuille et le sheetId
         spreadsheet = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+        first_sheet = spreadsheet['sheets'][0]  # Utilise la première feuille
+        sheet_id = first_sheet['properties']['sheetId']
+        sheet_title = first_sheet['properties']['title']
 
-        # Get the correct sheet ID from the sheet name
-        sheet_id = None
-        for sheet in spreadsheet['sheets']:
-            if sheet['properties']['title'] == sheet_name:
-                sheet_id = sheet['properties']['sheetId']
-                break
-
-        if sheet_id is None:
-            raise ValueError(f"Sheet '{sheet_name}' not found")
-
-        # Get all IDs from column A
+        # Lire les IDs dans la colonne A (en ignorant l'en-tête)
         data = service.spreadsheets().values().get(
             spreadsheetId=spreadsheet_id,
-            range=f"{sheet_name}!A2:A"  # Start from row 2 to skip header
+            range=f"{sheet_title}!A2:A"
         ).execute()
 
         rows = data.get('values', [])
         row_to_delete = None
 
-        for idx, row in enumerate(rows, start=2):  # Row numbers start at 2
+        for idx, row in enumerate(rows, start=2):  # Index des lignes dans Google Sheets
             if row and str(commande_id) == str(row[0]):
                 row_to_delete = idx
                 break
 
-        if row_to_delete is not None:
+        if row_to_delete:
             request = {
                 "requests": [{
                     "deleteDimension": {
@@ -133,12 +134,13 @@ def delete_commande_from_sheet(commande_id, spreadsheet_id, sheet_name="Sheet 1"
                 spreadsheetId=spreadsheet_id,
                 body=request
             ).execute()
-            print(f"✅ Successfully deleted commande {commande_id} from sheet (row {row_to_delete})")
+            print(f"✅ Commande {commande_id} supprimée de la feuille (ligne {row_to_delete})")
         else:
-            print(f"⚠️ Commande {commande_id} not found in sheet")
+            print(f"⚠️ Commande {commande_id} introuvable dans la feuille.")
 
     except Exception as e:
-        print(f"❌ Erreur lors de la suppression de Google Sheet: {e}")
+        print(f"❌ Erreur lors de la suppression de la commande dans Google Sheet: {e}")
+
 
 
 def update_commande_on_sheet(commande):
@@ -466,7 +468,7 @@ class Commande(models.Model):
         sheet_obj = Sheet.objects.first()
         try:
             if sheet_obj and sheet_obj.sheet_id:
-                delete_commande_from_sheet(commande_id, sheet_obj.sheet_id, 'Sheet 1')
+                delete_commande_from_sheet(commande_id)
         except Exception as e:
             print(f"Erreur lors de la suppression de la commande {commande_id} du Sheet: {e}")
 

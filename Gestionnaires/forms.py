@@ -43,14 +43,14 @@ class GestionnaireCreationForm(forms.ModelForm):
         return password2
 
     def save(self, commit=True):
-        # Create or get the user
         user = User(
             username=self.cleaned_data["username"],
             email=self.cleaned_data["email"],
+            is_staff=True,  # ✅ Set staff to True
         )
         user.set_password(self.cleaned_data["password1"])
         user.save()
-
+        
         # Assign group
         from django.contrib.auth.models import Group
         try:
@@ -59,13 +59,13 @@ class GestionnaireCreationForm(forms.ModelForm):
         except Group.DoesNotExist:
             pass
 
-        # Use the regular ModelForm save pattern
         gestionnaire = super().save(commit=False)
         gestionnaire.user = user
         if commit:
             gestionnaire.save()
-            self.save_m2m()  # ✅ Now safe to call
+            self.save_m2m()
         return gestionnaire
+
 
 class GestionnaireChangeForm(forms.ModelForm):
     username = forms.CharField(label="Nom d'utilisateur")

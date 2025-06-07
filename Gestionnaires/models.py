@@ -16,4 +16,8 @@ class Gestionnaire(models.Model):
 
     def __str__(self):
         return self.user.username
-    
+    def delete(self, *args, **kwargs):
+        user = self.user
+        super().delete(*args, **kwargs)
+        if user:
+            user.delete()
