@@ -221,7 +221,6 @@ SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
 SESSION_CACHE_ALIAS = 'default'
 SESSION_COOKIE_AGE = 86400  
 
-
 # Logging configuration to monitor slow queries
 LOGGING = {
     'version': 1,

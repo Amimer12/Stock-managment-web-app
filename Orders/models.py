@@ -86,61 +86,6 @@ def append_commande_to_sheet(commande):
         print(f"Erreur lors de l'ajout à Google Sheet: {e}")
 
 
-
-def delete_commande_from_sheet(commande_id):
-    try:
-        sheet_obj = Sheet.objects.first()
-        if not sheet_obj:
-            print("No sheet configured.")
-            return
-
-        sheet_id = sheet_obj.sheet_id
-        if not sheet_id:
-            print("Sheet ID missing.")
-            return
-
-        service = get_sheets_service()
-        sheet = service.spreadsheets()
-
-        # Fetch all rows from the sheet
-        result = sheet.values().get(
-            spreadsheetId=sheet_id,
-            range="A2:A"  # Assuming ID is in column A, starting from row 2
-        ).execute()
-
-        values = result.get('values', [])
-        row_to_delete = None
-
-        for idx, row in enumerate(values, start=2):  # Start=2 to match actual row numbers
-            if row and str(row[0]) == str(commande_id):
-                row_to_delete = idx
-                break
-
-        if row_to_delete:
-            # Delete the matched row using deleteDimension
-            delete_request = {
-                "requests": [
-                    {
-                        "deleteDimension": {
-                            "range": {
-                                "sheetId": 0,  # usually the first sheet has ID 0
-                                "dimension": "ROWS",
-                                "startIndex": row_to_delete - 1,  # 0-based index
-                                "endIndex": row_to_delete
-                            }
-                        }
-                    }
-                ]
-            }
-            sheet.batchUpdate(spreadsheetId=sheet_id, body=delete_request).execute()
-            print(f"Commande ID {commande_id} deleted from Google Sheet (row {row_to_delete}).")
-        else:
-            print(f"Commande ID {commande_id} not found in Google Sheet.")
-
-    except Exception as e:
-        print(f"Error while deleting from Google Sheet: {e}")
-
-
 def update_commande_on_sheet(commande):
     """Update commande in Google Sheet"""
     try:
@@ -385,9 +330,6 @@ class Commande(models.Model):
         # Add database indexes for better performance
         indexes = [
             models.Index(fields=['-id_commande']),  # For ordering by ID desc
-            models.Index(fields=['date_commande']),
-            models.Index(fields=['etat_commande']),
-            models.Index(fields=['produit_commandé']),
         ]
         # Default ordering: latest first
         ordering = ['-id_commande']
@@ -452,29 +394,6 @@ class Commande(models.Model):
             append_commande_to_sheet(self)
         else:
             update_commande_on_sheet(self)
-
-    def delete(self, *args, **kwargs):
-        # Store commande_id before deletion
-        commande_id = self.id_commande
-        
-        # Restore stock when deleting
-        if self.produit_commandé:
-            self.produit_commandé.quantite += self.quantite_commandé
-            self.produit_commandé.save()
-
-        # Remove from Google Sheet BEFORE deleting from database
-        try:
-            success = delete_commande_from_sheet(commande_id)
-            if not success:
-                print(f"Warning: Could not delete commande {commande_id} from Google Sheet")
-        except Exception as e:
-            print(f"Error deleting from Google Sheet: {e}")
-            import traceback
-            traceback.print_exc()
-            # Continue with database deletion even if sheet deletion fails
-        
-        # Delete from database
-        super().delete(*args, **kwargs)
 
 
 class Sheet(models.Model):
