@@ -1,7 +1,7 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.utils.timezone import now
-from Products.models import Variant,Produit, Couleur, Taille
+from Products.models import Variant, Produit, Couleur, Taille
 from django.core.exceptions import ValidationError
 from decimal import Decimal
 import re
@@ -15,16 +15,19 @@ def append_commande_to_sheet(commande):
     try:
         sheet_obj = Sheet.objects.first()
         if not sheet_obj or not sheet_obj.sheet_id:
+            print("[✘] No sheet configured")
             return
 
         service = get_sheets_service()
         sheet = service.spreadsheets()
-        produits = commande.produitcommande_set.all()
+        
+        # Use the correct related name 'produits' instead of 'produitcommande_set'
+        produits = commande.produits.all()
 
         if produits.exists():
             produit_strs = []
             skus = []
-            boutique_name = produits[0].produit.boutique.nom_boutique if produits[0].produit.boutique else "N/A"
+            boutique_name = produits[0].produit.boutique.nom_boutique if produits[0].produit and produits[0].produit.boutique else "N/A"
 
             for pc in produits:
                 variant = pc.get_variant()
@@ -36,12 +39,12 @@ def append_commande_to_sheet(commande):
             produits_text = ", ".join(produit_strs)
             skus_text = ", ".join(skus)
         else:
-            produits_text = ""
-            skus_text = ""
+            produits_text = "No products"
+            skus_text = "N/A"
             boutique_name = "N/A"
 
         values = [[
-            commande.id_commande,
+            str(commande.id_commande),
             commande.date_commande.strftime('%d/%m/%Y'),
             skus_text,
             boutique_name,
@@ -85,23 +88,27 @@ def append_commande_to_sheet(commande):
         print(f"[✔] Added commande {commande.id_commande} to sheet")
     except Exception as e:
         print(f"[✘] Erreur ajout Google Sheet: {e}")
-
+        import traceback
+        traceback.print_exc()
 
 
 def update_commande_on_sheet(commande):
     try:
         sheet_obj = Sheet.objects.first()
         if not sheet_obj or not sheet_obj.sheet_id:
+            print("[✘] No sheet configured")
             return
 
         service = get_sheets_service()
         sheet = service.spreadsheets()
-        produits = commande.produitcommande_set.all()
+        
+        # Use the correct related name 'produits' instead of 'produitcommande_set'
+        produits = commande.produits.all()
 
         if produits.exists():
             produit_strs = []
             skus = []
-            boutique_name = produits[0].produit.boutique.nom_boutique if produits[0].produit.boutique else "N/A"
+            boutique_name = produits[0].produit.boutique.nom_boutique if produits[0].produit and produits[0].produit.boutique else "N/A"
             for pc in produits:
                 variant = pc.get_variant()
                 produit_strs.append(
@@ -112,8 +119,8 @@ def update_commande_on_sheet(commande):
             produits_text = ", ".join(produit_strs)
             skus_text = ", ".join(skus)
         else:
-            produits_text = ""
-            skus_text = ""
+            produits_text = "No products"
+            skus_text = "N/A"
             boutique_name = "N/A"
 
         updated_row = [
@@ -134,12 +141,14 @@ def update_commande_on_sheet(commande):
             commande.Bureau_ZD or ''
         ]
 
+        # Get all data to find the row to update
         data = sheet.values().get(
             spreadsheetId=sheet_obj.sheet_id,
             range="A2:A"
         ).execute()
         rows = data.get('values', [])
 
+        row_found = False
         for idx, row in enumerate(rows, start=2):
             if row and str(commande.id_commande) == str(row[0]):
                 sheet.values().update(
@@ -149,9 +158,17 @@ def update_commande_on_sheet(commande):
                     body={'values': [updated_row]}
                 ).execute()
                 print(f"[✔] Updated commande {commande.id_commande} in sheet")
+                row_found = True
                 break
+        
+        if not row_found:
+            print(f"[!] Commande {commande.id_commande} not found in sheet, adding new row")
+            append_commande_to_sheet(commande)
+            
     except Exception as e:
         print(f"[✘] Erreur update Google Sheet: {e}")
+        import traceback
+        traceback.print_exc()
 
 def initialize_sheet_headers(sheet_id):
     """Initialize sheet with new column order"""
@@ -165,7 +182,7 @@ def initialize_sheet_headers(sheet_id):
             range="A:Z"
         ).execute()
 
-        # Step 2: Add headers with new order
+        # Step 2: Add headers with correct order (15 columns)
         headers = [[
             "ID", "Date", "SKU", "Boutique", "Produit",
             "État", "Nom client", "Téléphone", "Prix total",
@@ -173,12 +190,11 @@ def initialize_sheet_headers(sheet_id):
             "Bureau Yalidine", "Bureau ZD"
         ]]
 
-
         body = {'values': headers}
 
         sheet.values().update(
             spreadsheetId=sheet_id,
-            range="A1:P1",
+            range="A1:O1",  # Changed from P1 to O1 (15 columns)
             valueInputOption="RAW",
             body=body
         ).execute()
@@ -189,7 +205,9 @@ def initialize_sheet_headers(sheet_id):
                 "range": {
                     "sheetId": 0,
                     "startRowIndex": 0,
-                    "endRowIndex": 1
+                    "endRowIndex": 1,
+                    "startColumnIndex": 0,
+                    "endColumnIndex": 15  # 15 columns (A-O)
                 },
                 "cell": {
                     "userEnteredFormat": {
@@ -216,8 +234,12 @@ def initialize_sheet_headers(sheet_id):
             spreadsheetId=sheet_id,
             body={"requests": requests}
         ).execute()
+        
+        print("[✔] Sheet headers initialized successfully")
     except Exception as e:
         print("Erreur lors de l'initialisation des en-têtes:", e)
+        import traceback
+        traceback.print_exc()
 
 
 def export_all_commandes_to_sheet(sheet_id):
@@ -226,22 +248,25 @@ def export_all_commandes_to_sheet(sheet_id):
         service = get_sheets_service()
         sheet = service.spreadsheets()
 
-        commandes = Commande.objects.prefetch_related(
-            'produitcommande_set__produit__boutique',
-            'produitcommande_set__couleur',
-            'produitcommande_set__taille'
+        # Use select_related and prefetch_related for better performance
+        commandes = Commande.objects.select_related().prefetch_related(
+            'produits__produit__boutique',
+            'produits__couleur',
+            'produits__taille'
         ).order_by('-id_commande')
 
         if not commandes.exists():
+            print("[!] No commandes found to export")
             return
 
         rows = []
         for cmd in commandes:
-            produits = cmd.produitcommande_set.all()
+            # Use the correct related name 'produits'
+            produits = cmd.produits.all()
             if produits.exists():
                 produit_strs = []
                 skus = []
-                boutique_name = produits[0].produit.boutique.nom_boutique if produits[0].produit.boutique else "N/A"
+                boutique_name = produits[0].produit.boutique.nom_boutique if produits[0].produit and produits[0].produit.boutique else "N/A"
                 for pc in produits:
                     variant = pc.get_variant()
                     produit_strs.append(
@@ -252,12 +277,12 @@ def export_all_commandes_to_sheet(sheet_id):
                 produits_text = ", ".join(produit_strs)
                 skus_text = ", ".join(skus)
             else:
-                produits_text = ""
-                skus_text = ""
+                produits_text = "No products"
+                skus_text = "N/A"
                 boutique_name = "N/A"
 
             rows.append([
-                cmd.id_commande,
+                str(cmd.id_commande),
                 cmd.date_commande.strftime('%d/%m/%Y'),
                 skus_text,
                 boutique_name,
@@ -274,21 +299,26 @@ def export_all_commandes_to_sheet(sheet_id):
                 cmd.Bureau_ZD or ''
             ])
 
+        # Clear existing data (except headers)
         sheet.values().clear(
             spreadsheetId=sheet_id,
             range="A2:Z1000"
         ).execute()
 
-        sheet.values().update(
-            spreadsheetId=sheet_id,
-            range="A2:O",
-            valueInputOption="USER_ENTERED",
-            body={'values': rows}
-        ).execute()
+        # Write all rows at once
+        if rows:
+            sheet.values().update(
+                spreadsheetId=sheet_id,
+                range="A2:O",
+                valueInputOption="USER_ENTERED",
+                body={'values': rows}
+            ).execute()
 
         print(f"[✔] Exported {len(rows)} commandes")
     except Exception as e:
         print(f"[✘] Erreur export Google Sheet: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 WILAYA_CHOICES = [
@@ -348,11 +378,14 @@ class Commande(models.Model):
         is_new = self.pk is None
         super().save(*args, **kwargs)
 
+        # Add delay to ensure related objects are saved
         if is_new:
-            append_commande_to_sheet(self)
+            # Use Django's transaction.on_commit to ensure the transaction is complete
+            from django.db import transaction
+            transaction.on_commit(lambda: append_commande_to_sheet(self))
         else:
-            update_commande_on_sheet(self)
-
+            from django.db import transaction
+            transaction.on_commit(lambda: update_commande_on_sheet(self))
 
 
 class ProduitCommande(models.Model):
@@ -366,12 +399,14 @@ class ProduitCommande(models.Model):
         unique_together = ('commande', 'produit', 'couleur', 'taille')
 
     def get_variant(self):
-        return Variant.objects.filter(
-            produit=self.produit,
-            couleur=self.couleur,
-            taille=self.taille
-        ).first()
-
+        try:
+            return Variant.objects.get(
+                produit=self.produit,
+                couleur=self.couleur,
+                taille=self.taille
+            )
+        except Variant.DoesNotExist:
+            return None
 
 
 class Sheet(models.Model):
@@ -398,8 +433,16 @@ class Sheet(models.Model):
         
         # Initialize sheet when created
         if is_new and self.sheet_id:
+            from django.db import transaction
+            transaction.on_commit(lambda: self._initialize_and_export())
+
+    def _initialize_and_export(self):
+        """Helper method to initialize and export data"""
+        try:
             initialize_sheet_headers(self.sheet_id)
             export_all_commandes_to_sheet(self.sheet_id)
+        except Exception as e:
+            print(f"Error initializing sheet: {e}")
 
     def delete(self, *args, **kwargs):
         raise ValidationError("La suppression de Sheet n'est pas autorisée.")
