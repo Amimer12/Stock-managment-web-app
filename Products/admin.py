@@ -55,13 +55,13 @@ class TailleAdmin(admin.ModelAdmin):
 @admin.register(Variant)
 class VariantAdmin(admin.ModelAdmin):
     list_display = ('get_display_variant','produit', 'couleur', 'taille', 'quantite')
-    search_fields = ('produit__nom_produit', 'couleur__nom_couleur', 'taille__nom_taille')
+    search_fields = ('produit__nom_produit', 'couleur__nom_couleur', 'taille__nom_taille','SKU')
     list_filter = ('produit', 'couleur', 'taille')
     ordering = ('-id_variant',)
     fieldsets = [
             ('Details de produit', {
                 'classes': ('',),
-                'fields': [ 'produit', 'couleur','taille', 'quantite',]}),
+                'fields': [ 'SKU','produit', 'couleur','taille', 'quantite',]}),
         ]
     def get_display_variant (self, obj):
         return '{obj.produit} - {obj.couleur.nom_couleur} - {obj.taille.nom_taille}'.format(obj=obj)

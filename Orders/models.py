@@ -7,7 +7,7 @@ from decimal import Decimal
 import re
 
 # utils.py or models.py if preferred
-
+from django import forms
 from Orders.google_sheets import get_sheets_service
 from datetime import datetime
 
@@ -26,7 +26,7 @@ def append_commande_to_sheet(commande):
 
         couleur = commande.produit_commandé.couleur.nom_couleur
         taille = commande.produit_commandé.taille.nom_taille
-        sku = f"{produit.id_produit}-{couleur}-{taille}"
+        sku = commande.produit_commandé.SKU if commande.produit_commandé.SKU else 'N/A'
         boutique_name = produit.boutique.nom_boutique
 
         # New column order: ID, Date, SKU, Boutique, Produit, Couleur, Taille, Quantité, État, Nom client, Téléphone, Prix total, Type livraison, Adresse, Wilaya, Commune
@@ -46,7 +46,9 @@ def append_commande_to_sheet(commande):
             commande.type_livraison,
             commande.Adresse_livraison or '',
             commande.wilaya,
-            commande.commune or ''
+            commande.commune or '',
+            commande.Bureau_Yalidine or '',
+            commande.Bureau_ZD or ''
         ]]
 
         body = {
@@ -100,7 +102,8 @@ def update_commande_on_sheet(commande):
         produit = commande.produit_commandé.produit
         couleur = commande.produit_commandé.couleur.nom_couleur
         taille = commande.produit_commandé.taille.nom_taille
-        sku = f"{produit.id_produit}-{couleur}-{taille}"
+        sku = commande.produit_commandé.SKU if commande.produit_commandé.SKU else 'N/A'
+
         boutique_name = produit.boutique.nom_boutique
 
         # New column order
@@ -120,7 +123,9 @@ def update_commande_on_sheet(commande):
             commande.type_livraison,
             commande.Adresse_livraison or '',
             commande.wilaya,
-            commande.commune or ''
+            commande.commune or '',
+            commande.Bureau_Yalidine or '',
+            commande.Bureau_ZD or ''
         ]
 
         # Get IDs from column A to find the row
@@ -160,7 +165,8 @@ def initialize_sheet_headers(sheet_id):
         # Step 2: Add headers with new order
         headers = [[
             "ID", "Date", "SKU", "Boutique", "Produit", "Couleur", "Taille", "Quantité",
-            "État", "Nom client", "Téléphone", "Prix total", "Type livraison", "Adresse", "Wilaya", "Commune"
+            "État", "Nom client", "Téléphone", "Prix total", "Type livraison", "Adresse", "Wilaya", "Commune",
+            "Bureau Yalidine", "Bureau ZD"
         ]]
 
         body = {'values': headers}
@@ -231,7 +237,7 @@ def export_all_commandes_to_sheet(sheet_id):
             produit = commande.produit_commandé.produit
             couleur = commande.produit_commandé.couleur.nom_couleur
             taille = commande.produit_commandé.taille.nom_taille
-            sku = f"{produit.id_produit}-{couleur}-{taille}"
+            sku = commande.produit_commandé.SKU if commande.produit_commandé.SKU else 'N/A'
             boutique_name = produit.boutique.nom_boutique
 
             # New column order
@@ -325,6 +331,8 @@ class Commande(models.Model):
     Adresse_livraison = models.CharField(max_length=255, blank=True, null=True)
     wilaya = models.CharField(max_length=100, choices=WILAYA_CHOICES, default='Alger', blank=False, null=False)
     commune = models.CharField(max_length=255, blank=True, null=True)
+    Bureau_Yalidine = models.CharField(max_length=255, blank=True, null=True,default=None, help_text="Bureau Yalidine pour livraison en bureau")
+    Bureau_ZD = models.CharField(max_length=255, blank=True, null=True,default=None, help_text="Bureau ZD pour livraison en bureau")
 
     class Meta:
         # Add database indexes for better performance
@@ -334,66 +342,31 @@ class Commande(models.Model):
         # Default ordering: latest first
         ordering = ['-id_commande']
 
-    def clean(self):
-        # Stock check
-        variant = self.produit_commandé
-        if variant:
-            if self.pk is None and self.quantite_commandé > variant.quantite:
-                raise ValidationError({
-                    'quantite_commandé': f"Stock insuffisant pour ce produit (stock actuel: {variant.quantite})"
-                })
-            elif self.pk is not None:
-                # For updates, check if the quantity change exceeds available stock
-                old_commande = Commande.objects.get(pk=self.pk)
-                quantity_difference = self.quantite_commandé - old_commande.quantite_commandé
-                if quantity_difference > variant.quantite:
-                    raise ValidationError({
-                        'quantite_commandé': f"Stock insuffisant pour cette modification (stock actuel: {variant.quantite})"
-                    })
-
-        # Address validation for home delivery
-        if self.type_livraison == 'Domicile' and not self.Adresse_livraison:
-            raise ValidationError({
-                'Adresse_livraison': "Veuillez entrer une adresse de livraison."
-            })
-
-        # Phone number validation (must be 10 or 11 digits)
-        if not re.fullmatch(r'\d{10,11}', self.numero_client or ''):
-            raise ValidationError({
-                'numero_client': "Entrez un numéro de téléphone réel."
-            })
-
     def save(self, *args, **kwargs):
-        self.full_clean()
         is_new = self.pk is None
         variant = self.produit_commandé
-
-        # Update stock
         if is_new and variant:
             variant.quantite -= self.quantite_commandé
             variant.save()
         elif not is_new and variant:
             old_commande = Commande.objects.get(pk=self.pk)
-            if old_commande.produit_commandé != self.produit_commandé or old_commande.quantite_commandé != self.quantite_commandé:
-                # Restore old stock if product changed
+            if old_commande.produit_commandé != variant or old_commande.quantite_commandé != self.quantite_commandé:
                 if old_commande.produit_commandé and old_commande.produit_commandé != variant:
                     old_commande.produit_commandé.quantite += old_commande.quantite_commandé
                     old_commande.produit_commandé.save()
-                
-                # Update current variant stock
+
                 if old_commande.produit_commandé == variant:
                     variant.quantite += old_commande.quantite_commandé
                 variant.quantite -= self.quantite_commandé
                 variant.save()
 
-        # Save the commande
         super().save(*args, **kwargs)
 
-        # Sync with Google Sheet
         if is_new:
             append_commande_to_sheet(self)
         else:
             update_commande_on_sheet(self)
+
 
 
 class Sheet(models.Model):

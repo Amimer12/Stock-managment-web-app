@@ -37,6 +37,7 @@ class Boutique(models.Model):
 
 class Variant(models.Model):
     id_variant = models.AutoField(primary_key=True)
+    SKU = models.CharField(max_length=50, blank=True, null=True, default='0')
     produit = models.ForeignKey(Produit, related_name="produit_couleur_taille", on_delete=models.SET_NULL, null=True)
     couleur = models.ForeignKey(Couleur, related_name="produit_couleur_taille", on_delete=models.SET_NULL, null=True)
     taille = models.ForeignKey(Taille, related_name="produit_couleur_taille", on_delete=models.SET_NULL, null=True)

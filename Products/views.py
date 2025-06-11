@@ -213,7 +213,7 @@ def download_commandes_sheet(request, etat_commande=None, boutique_id=None):
         'ID Commande', 'Date Commande', 'Produit Commandé', 'SKU',
         'Boutique', 'Couleur de produit', 'Taille de produit', 'Quantité Commandée',
         'État Commande', 'Nom Client', 'Numéro Client', 'Prix Total',
-        'Type Livraison', 'Adresse Livraison', 'Wilaya', 'Commune'
+        'Type Livraison', 'Adresse Livraison', 'Wilaya', 'Commune',"Bureau Yalidine", "Bureau ZD"
     ]
     for col, header in enumerate(headers):
         worksheet.write(0, col, header, header_format)
@@ -235,7 +235,7 @@ def download_commandes_sheet(request, etat_commande=None, boutique_id=None):
         produit = cmd.produit_commandé.produit
         couleur = cmd.produit_commandé.couleur.nom_couleur
         taille = cmd.produit_commandé.taille.nom_taille
-        sku = f"{produit.ID}-{couleur}-{taille}"
+        sku = cmd.produit_commandé.SKU if cmd.produit_commandé.SKU else 'N/A'
         boutique_name = produit.boutique.nom_boutique
 
         worksheet.write(row, 0, cmd.id_commande, cell_format)
@@ -254,6 +254,8 @@ def download_commandes_sheet(request, etat_commande=None, boutique_id=None):
         worksheet.write(row, 13, cmd.Adresse_livraison or '', cell_format)
         worksheet.write(row, 14, cmd.wilaya, cell_format)
         worksheet.write(row, 15, cmd.commune or '', cell_format)
+        worksheet.write(row, 16, cmd.Bureau_Yalidine or '', cell_format)
+        worksheet.write(row, 17, cmd.Bureau_ZD or '', cell_format)
         row += 1
 
     # Column widths
@@ -273,6 +275,8 @@ def download_commandes_sheet(request, etat_commande=None, boutique_id=None):
     worksheet.set_column('N:N', 25)
     worksheet.set_column('O:O', 25)
     worksheet.set_column('P:P', 25)
+    worksheet.set_column('Q:Q', 25)  # Bureau Yalidine
+    worksheet.set_column('R:R', 25)  # Bureau ZD
 
     # Return file
     workbook.close()

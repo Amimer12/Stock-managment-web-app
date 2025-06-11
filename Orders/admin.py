@@ -3,6 +3,10 @@ from .models import Commande
 from .forms import CommandeForm
 from Products.models import Variant, Produit
 from Gestionnaires.models import Gestionnaire
+from django.urls import path
+from django.http import JsonResponse
+
+
 @admin.register(Commande)
 class CommandeAdmin(admin.ModelAdmin):
     form = CommandeForm
@@ -11,28 +15,28 @@ class CommandeAdmin(admin.ModelAdmin):
     list_filter = ('etat_commande','date_commande', 'produit_commandé__produit','produit_commandé__couleur','produit_commandé__taille', 'type_livraison', 'wilaya')
     ordering = ('-date_commande',)
     fieldsets = [
+        ('Détails de produit', {
+            'fields': ['produit', 'couleur', 'taille', 'quantite_commandé']
+        }),
         ('Details de commande', {
-            'classes': ('',),
-            'fields': [ 'date_commande', 'etat_commande','produit_commandé', 'quantite_commandé',]}),
+            'fields': ['date_commande', 'etat_commande']
+        }),
         ('Details de livraison', {
-            'classes': ('',),
-            'fields': ['type_livraison', 'Adresse_livraison', 'wilaya', 'commune']
+            'fields': ['type_livraison', 'Adresse_livraison', 'wilaya', 'commune','Bureau_Yalidine','Bureau_ZD']
         }),
         ('Prix total', {
-            'classes': ('',),
-            'fields': ['prix_total',]
+            'fields': ['prix_total']
         }),
         ('Detail de client', {
-            'classes': ('',),
-            'fields': ['nom_client', 'numero_client',]
+            'fields': ['nom_client', 'numero_client']
         }),
-        
-    ]
+]
+
     def id_commande_display(self, obj):
         return f"Cmd #{obj.id_commande}"
     id_commande_display.short_description = 'ID Commande'
     def get_display_variant(self, obj):
-        return f"{obj.produit_commandé.produit.nom_produit} - {obj.produit_commandé.couleur.nom_couleur} - {obj.produit_commandé.taille.nom_taille}"
+        return f"{obj.produit_commandé.produit.nom_produit} - {obj.produit_commandé.couleur.nom_couleur} - {obj.produit_commandé.taille.nom_taille}" if obj.produit_commandé else "Aucun produit"
     get_display_variant.short_description = 'Produit commandé'
 
     def prix_total_dzd(self, obj):
@@ -51,8 +55,29 @@ class CommandeAdmin(admin.ModelAdmin):
             ).distinct()
         return form
     
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path('check-variant/', self.admin_site.admin_view(self.check_variant)),
+        ]
+        return custom_urls + urls
+
+    def check_variant(self, request):
+        produit_id = request.GET.get('produit')
+        couleur_id = request.GET.get('couleur')
+        taille_id = request.GET.get('taille')
+
+        try:
+            variant = Variant.objects.get(
+                produit_id=produit_id,
+                couleur_id=couleur_id,
+                taille_id=taille_id
+            )
+            return JsonResponse({'message': f"Quantité disponible: {variant.quantite}"})
+        except Variant.DoesNotExist:
+            return JsonResponse({'message': "Aucun variant correspondant."})
     class Media:
-        js = ('wilaya_bureau.js',)  
+        js = ('wilaya_bureau.js','bureau.js',)  
 
 # admin.py
 from django.contrib import admin

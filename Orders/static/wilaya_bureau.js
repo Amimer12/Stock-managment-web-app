@@ -1642,4 +1642,3 @@ window.addEventListener('DOMContentLoaded', function () {
         }
     }
 });
-

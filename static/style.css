@@ -1,0 +1,12 @@
+#google_translate_element select {
+    padding: 6px 18px !important;
+    border-radius: 8px !important;
+    font-size: 15px !important;
+    border: 1.5px solid #1ABC9C !important;
+    background: #f4f8fb !important;
+    color: #1ABC9C !important;
+    font-weight: 600 !important;
+    box-shadow: 0 2px 8px rgba(44,62,80,0.07) !important;
+    cursor: pointer !important;
+    transition: all 0.2s !important;
+}
