@@ -212,7 +212,7 @@ def download_commandes_sheet(request, etat_commande=None):
         'ID Commande', 'Date Commande', 'Produit Commandé', 'SKU',
         'Boutique', 'État Commande', 'Nom Client', 'Numéro Client', 'Prix Total',
         'Type Livraison', 'Adresse Livraison', 'Wilaya', 'Commune',
-        "Bureau Yalidine", "Bureau ZD"
+        "Bureau Yalidine", "Bureau ZR"
     ]
     for col, header in enumerate(headers):
         worksheet.write(0, col, header, header_format)
@@ -267,7 +267,7 @@ def download_commandes_sheet(request, etat_commande=None):
         worksheet.write(row, 11, cmd.wilaya, cell_format)
         worksheet.write(row, 12, cmd.commune or '', cell_format)
         worksheet.write(row, 13, cmd.Bureau_Yalidine or '', cell_format)
-        worksheet.write(row, 14, cmd.Bureau_ZD or '', cell_format)
+        worksheet.write(row, 14, cmd.Bureau_ZR or '', cell_format)
         row += 1
 
     # Column widths

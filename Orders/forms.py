@@ -79,7 +79,7 @@ class CommandeForm(forms.ModelForm):
         adresse = cleaned_data.get('Adresse_livraison')
         numero = cleaned_data.get('numero_client')
         bureau_yalidine = cleaned_data.get('Bureau_Yalidine')
-        bureau_zd = cleaned_data.get('Bureau_ZD')
+        bureau_zd = cleaned_data.get('Bureau_ZR')
 
         # Variant resolution
         if bureau_yalidine and bureau_zd:

@@ -58,7 +58,7 @@ def append_commande_to_sheet(commande):
             commande.wilaya,
             commande.commune or '',
             commande.Bureau_Yalidine or '',
-            commande.Bureau_ZD or ''
+            commande.Bureau_ZR or ''
         ]]
 
         # Insert new row at position 2
@@ -138,7 +138,7 @@ def update_commande_on_sheet(commande):
             commande.wilaya,
             commande.commune or '',
             commande.Bureau_Yalidine or '',
-            commande.Bureau_ZD or ''
+            commande.Bureau_ZR or ''
         ]
 
         # Get all data to find the row to update
@@ -187,7 +187,7 @@ def initialize_sheet_headers(sheet_id):
             "ID", "Date", "SKU", "Boutique", "Produit",
             "État", "Nom client", "Téléphone", "Prix total",
             "Type livraison", "Adresse", "Wilaya", "Commune",
-            "Bureau Yalidine", "Bureau ZD"
+            "Bureau Yalidine", "Bureau ZR"
         ]]
 
         body = {'values': headers}
@@ -296,7 +296,7 @@ def export_all_commandes_to_sheet(sheet_id):
                 cmd.wilaya,
                 cmd.commune or '',
                 cmd.Bureau_Yalidine or '',
-                cmd.Bureau_ZD or ''
+                cmd.Bureau_ZR or ''
             ])
 
         # Clear existing data (except headers)
@@ -368,7 +368,7 @@ class Commande(models.Model):
     wilaya = models.CharField(max_length=100, choices=WILAYA_CHOICES, default='Alger')
     commune = models.CharField(max_length=255, blank=True, null=True)
     Bureau_Yalidine = models.CharField(max_length=255, blank=True, null=True, default=None)
-    Bureau_ZD = models.CharField(max_length=255, blank=True, null=True, default=None)
+    Bureau_ZR = models.CharField(max_length=255, blank=True, null=True, default=None)
 
     class Meta:
         indexes = [models.Index(fields=['-id_commande'])]

@@ -58,7 +58,7 @@ class CommandeAdmin(admin.ModelAdmin):
             'fields': ['date_commande', 'etat_commande']
         }),
         ('Details de livraison', {
-            'fields': ['type_livraison', 'Adresse_livraison', 'wilaya', 'commune','Bureau_Yalidine','Bureau_ZD']
+            'fields': ['type_livraison', 'Adresse_livraison', 'wilaya', 'commune','Bureau_Yalidine','Bureau_ZR']
         }),
         ('Prix total', {
             'fields': ['prix_total']

@@ -527,23 +527,32 @@
         
         <!-- Commandes Tab Content -->
         <div id="commandes-content" class="tab-content">
-            <div class="info-box" style="display: flex; flex-direction: column;">
-                <h3>Le fichier commandes contiendra :</h3>
-                <ul>
-                    <li>ID de la commande</li>
-                    <li>Date de commande</li>
-                    <li>Produit commandé</li>
-                    <li>Quantité commandée</li>
-                    <li>État de la commande</li>
-                    <li>Nom du client</li>
-                    <li>Numéro du client</li>
-                    <li>Prix total (DZD)</li>
-                    <li>Type de livraison</li>
-                    <li>Adresse de livraison</li>
-                    <li>Wilaya</li>
-                    <li>Bureau</li>
-                </ul>
-            </div>
+    <div class="info-box" style="display: flex; flex-direction: column;">
+        <h3>Le fichier commandes contiendra :</h3>
+        <ul>
+            <li><strong>ID de la commande</strong></li>
+            <li><strong>Date de commande</strong> (format : JJ/MM/AAAA)</li>
+            <li><strong>SKU(s)</strong> (séparés par des virgules s’il y a plusieurs produits)</li>
+            <li><strong>Boutique</strong> (du premier produit)</li>
+            <li><strong>Produit(s) commandé(s)</strong> – format : <code>Nom-Couleur-Taille (xQuantité)</code>, séparés par virgule</li>
+            <li><strong>État de la commande</strong></li>
+            <li><strong>Nom du client</strong></li>
+            <li><strong>Numéro du client</strong></li>
+            <li><strong>Prix total</strong> (en DZD)</li>
+            <li><strong>Type de livraison</strong></li>
+            <li><strong>Adresse de livraison</strong> (si disponible)</li>
+            <li><strong>Wilaya</strong></li>
+            <li><strong>Commune</strong> (si disponible)</li>
+            <li><strong>Bureau Yalidine</strong> (si applicable)</li>
+            <li><strong>Bureau ZD</strong> (si applicable)</li>
+        </ul>
+        <p style="margin-top: 10px;">
+            <strong>🛈 Remarque sur les produits :</strong><br>
+            Si une commande contient plusieurs produits, ils seront regroupés dans une seule cellule, séparés par des virgules.<br>
+            Exemple : <code>Robe-Rouge-M (x2), T-shirt-Bleu-L (x1)</code>
+        </p>
+    </div>
+
             
             <form method="post">
             {% csrf_token %}
