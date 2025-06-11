@@ -1,7 +1,7 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.utils.timezone import now
-from Products.models import Variant
+from Products.models import Variant,Produit, Couleur, Taille
 from django.core.exceptions import ValidationError
 from decimal import Decimal
 import re
@@ -14,31 +14,38 @@ from datetime import datetime
 def append_commande_to_sheet(commande):
     try:
         sheet_obj = Sheet.objects.first()
-        if not sheet_obj:
-            return  # No sheet configured
-        sheet_id = sheet_obj.sheet_id
-        if not sheet_id:
+        if not sheet_obj or not sheet_obj.sheet_id:
             return
 
         service = get_sheets_service()
         sheet = service.spreadsheets()
-        produit = commande.produit_commandé.produit
+        produits = commande.produitcommande_set.all()
 
-        couleur = commande.produit_commandé.couleur.nom_couleur
-        taille = commande.produit_commandé.taille.nom_taille
-        sku = commande.produit_commandé.SKU if commande.produit_commandé.SKU else 'N/A'
-        boutique_name = produit.boutique.nom_boutique
+        if produits.exists():
+            produit_strs = []
+            skus = []
+            boutique_name = produits[0].produit.boutique.nom_boutique if produits[0].produit.boutique else "N/A"
 
-        # New column order: ID, Date, SKU, Boutique, Produit, Couleur, Taille, Quantité, État, Nom client, Téléphone, Prix total, Type livraison, Adresse, Wilaya, Commune
+            for pc in produits:
+                variant = pc.get_variant()
+                produit_strs.append(
+                    f"{pc.produit.nom_produit}-{pc.couleur.nom_couleur}-{pc.taille.nom_taille} (x{pc.quantite})"
+                )
+                skus.append(variant.SKU if variant and variant.SKU else "N/A")
+
+            produits_text = ", ".join(produit_strs)
+            skus_text = ", ".join(skus)
+        else:
+            produits_text = ""
+            skus_text = ""
+            boutique_name = "N/A"
+
         values = [[
             commande.id_commande,
             commande.date_commande.strftime('%d/%m/%Y'),
-            sku,
+            skus_text,
             boutique_name,
-            produit.nom_produit,
-            couleur,
-            taille,
-            commande.quantite_commandé,
+            produits_text,
             commande.etat_commande,
             commande.nom_client,
             commande.numero_client,
@@ -51,71 +58,70 @@ def append_commande_to_sheet(commande):
             commande.Bureau_ZD or ''
         ]]
 
-        body = {
-            'values': values
-        }
-
-        # First, insert a new row at position 2 to maintain latest-first order
-        insert_request = {
-            "requests": [{
+        # Insert new row at position 2
+        sheet.batchUpdate(
+            spreadsheetId=sheet_obj.sheet_id,
+            body={"requests": [{
                 "insertDimension": {
                     "range": {
                         "sheetId": 0,
                         "dimension": "ROWS",
-                        "startIndex": 1,  # Insert after header (row 2)
+                        "startIndex": 1,
                         "endIndex": 2
                     },
                     "inheritFromBefore": False
                 }
-            }]
-        }
-        
-        service.spreadsheets().batchUpdate(
-            spreadsheetId=sheet_id,
-            body=insert_request
+            }]}
         ).execute()
 
-        # Then add the data to the new row
+        # Write the row
         sheet.values().update(
-            spreadsheetId=sheet_id,
-            range="A2:P2",
+            spreadsheetId=sheet_obj.sheet_id,
+            range="A2:O2",
             valueInputOption="USER_ENTERED",
-            body=body
+            body={'values': values}
         ).execute()
-        
-        print(f"Added commande {commande.id_commande} to sheet")
+
+        print(f"[✔] Added commande {commande.id_commande} to sheet")
     except Exception as e:
-        print(f"Erreur lors de l'ajout à Google Sheet: {e}")
+        print(f"[✘] Erreur ajout Google Sheet: {e}")
+
 
 
 def update_commande_on_sheet(commande):
-    """Update commande in Google Sheet"""
     try:
         sheet_obj = Sheet.objects.first()
         if not sheet_obj or not sheet_obj.sheet_id:
             return
 
-        sheet_id = sheet_obj.sheet_id
         service = get_sheets_service()
         sheet = service.spreadsheets()
+        produits = commande.produitcommande_set.all()
 
-        produit = commande.produit_commandé.produit
-        couleur = commande.produit_commandé.couleur.nom_couleur
-        taille = commande.produit_commandé.taille.nom_taille
-        sku = commande.produit_commandé.SKU if commande.produit_commandé.SKU else 'N/A'
+        if produits.exists():
+            produit_strs = []
+            skus = []
+            boutique_name = produits[0].produit.boutique.nom_boutique if produits[0].produit.boutique else "N/A"
+            for pc in produits:
+                variant = pc.get_variant()
+                produit_strs.append(
+                    f"{pc.produit.nom_produit}-{pc.couleur.nom_couleur}-{pc.taille.nom_taille} (x{pc.quantite})"
+                )
+                skus.append(variant.SKU if variant and variant.SKU else "N/A")
 
-        boutique_name = produit.boutique.nom_boutique
+            produits_text = ", ".join(produit_strs)
+            skus_text = ", ".join(skus)
+        else:
+            produits_text = ""
+            skus_text = ""
+            boutique_name = "N/A"
 
-        # New column order
         updated_row = [
             str(commande.id_commande),
             commande.date_commande.strftime('%d/%m/%Y'),
-            sku,
+            skus_text,
             boutique_name,
-            produit.nom_produit,
-            couleur,
-            taille,
-            commande.quantite_commandé,
+            produits_text,
             commande.etat_commande,
             commande.nom_client,
             commande.numero_client,
@@ -128,27 +134,24 @@ def update_commande_on_sheet(commande):
             commande.Bureau_ZD or ''
         ]
 
-        # Get IDs from column A to find the row
         data = sheet.values().get(
-            spreadsheetId=sheet_id,
-            range="A2:A"  # Start from row 2 (skip header)
+            spreadsheetId=sheet_obj.sheet_id,
+            range="A2:A"
         ).execute()
         rows = data.get('values', [])
 
-        for idx, row in enumerate(rows, start=2):  # Start counting from row 2
-            if row and len(row) > 0 and str(commande.id_commande) == str(row[0]):
-                range_str = f"A{idx}:P{idx}"
+        for idx, row in enumerate(rows, start=2):
+            if row and str(commande.id_commande) == str(row[0]):
                 sheet.values().update(
-                    spreadsheetId=sheet_id,
-                    range=range_str,
+                    spreadsheetId=sheet_obj.sheet_id,
+                    range=f"A{idx}:O{idx}",
                     valueInputOption="USER_ENTERED",
                     body={'values': [updated_row]}
                 ).execute()
-                print(f"Updated commande {commande.id_commande} in sheet (row {idx})")
+                print(f"[✔] Updated commande {commande.id_commande} in sheet")
                 break
     except Exception as e:
-        print(f"Erreur de mise à jour Google Sheet: {e}")
-
+        print(f"[✘] Erreur update Google Sheet: {e}")
 
 def initialize_sheet_headers(sheet_id):
     """Initialize sheet with new column order"""
@@ -164,10 +167,12 @@ def initialize_sheet_headers(sheet_id):
 
         # Step 2: Add headers with new order
         headers = [[
-            "ID", "Date", "SKU", "Boutique", "Produit", "Couleur", "Taille", "Quantité",
-            "État", "Nom client", "Téléphone", "Prix total", "Type livraison", "Adresse", "Wilaya", "Commune",
+            "ID", "Date", "SKU", "Boutique", "Produit",
+            "État", "Nom client", "Téléphone", "Prix total",
+            "Type livraison", "Adresse", "Wilaya", "Commune",
             "Bureau Yalidine", "Bureau ZD"
         ]]
+
 
         body = {'values': headers}
 
@@ -216,71 +221,74 @@ def initialize_sheet_headers(sheet_id):
 
 
 def export_all_commandes_to_sheet(sheet_id):
-    """Export all commandes to Google Sheet with proper ordering"""
     try:
         from Orders.models import Commande
         service = get_sheets_service()
         sheet = service.spreadsheets()
 
-        # Order by ID descending (latest first) with select_related for efficiency
-        commandes = Commande.objects.select_related(
-            'produit_commandé__produit__boutique',
-            'produit_commandé__couleur',
-            'produit_commandé__taille'
+        commandes = Commande.objects.prefetch_related(
+            'produitcommande_set__produit__boutique',
+            'produitcommande_set__couleur',
+            'produitcommande_set__taille'
         ).order_by('-id_commande')
-        
+
         if not commandes.exists():
             return
 
         rows = []
-        for commande in commandes:
-            produit = commande.produit_commandé.produit
-            couleur = commande.produit_commandé.couleur.nom_couleur
-            taille = commande.produit_commandé.taille.nom_taille
-            sku = commande.produit_commandé.SKU if commande.produit_commandé.SKU else 'N/A'
-            boutique_name = produit.boutique.nom_boutique
+        for cmd in commandes:
+            produits = cmd.produitcommande_set.all()
+            if produits.exists():
+                produit_strs = []
+                skus = []
+                boutique_name = produits[0].produit.boutique.nom_boutique if produits[0].produit.boutique else "N/A"
+                for pc in produits:
+                    variant = pc.get_variant()
+                    produit_strs.append(
+                        f"{pc.produit.nom_produit}-{pc.couleur.nom_couleur}-{pc.taille.nom_taille} (x{pc.quantite})"
+                    )
+                    skus.append(variant.SKU if variant and variant.SKU else "N/A")
 
-            # New column order
+                produits_text = ", ".join(produit_strs)
+                skus_text = ", ".join(skus)
+            else:
+                produits_text = ""
+                skus_text = ""
+                boutique_name = "N/A"
+
             rows.append([
-                commande.id_commande,
-                commande.date_commande.strftime('%d/%m/%Y'),
-                sku,
+                cmd.id_commande,
+                cmd.date_commande.strftime('%d/%m/%Y'),
+                skus_text,
                 boutique_name,
-                produit.nom_produit,
-                couleur,
-                taille,
-                commande.quantite_commandé,
-                commande.etat_commande,
-                commande.nom_client,
-                commande.numero_client,
-                f"{float(commande.prix_total)} DZD",
-                commande.type_livraison,
-                commande.Adresse_livraison or '',
-                commande.wilaya,
-                commande.commune or ''
+                produits_text,
+                cmd.etat_commande,
+                cmd.nom_client,
+                cmd.numero_client,
+                f"{float(cmd.prix_total)} DZD",
+                cmd.type_livraison,
+                cmd.Adresse_livraison or '',
+                cmd.wilaya,
+                cmd.commune or '',
+                cmd.Bureau_Yalidine or '',
+                cmd.Bureau_ZD or ''
             ])
 
-        # Clear existing data first (except headers)
-        if rows:
-            # Calculate the range to clear (from row 2 to the end)
-            clear_range = f"A2:P{len(rows) + 100}"  # Clear extra rows to ensure no old data remains
-            sheet.values().clear(
-                spreadsheetId=sheet_id,
-                range=clear_range
-            ).execute()
+        sheet.values().clear(
+            spreadsheetId=sheet_id,
+            range="A2:Z1000"
+        ).execute()
 
-            # Use single batch update for better performance
-            body = {'values': rows}
-            sheet.values().update(
-                spreadsheetId=sheet_id,
-                range=f"A2:P{len(rows) + 1}",
-                valueInputOption="USER_ENTERED",
-                body=body
-            ).execute()
-            
-            print(f"Exported {len(rows)} commandes to sheet")
+        sheet.values().update(
+            spreadsheetId=sheet_id,
+            range="A2:O",
+            valueInputOption="USER_ENTERED",
+            body={'values': rows}
+        ).execute()
+
+        print(f"[✔] Exported {len(rows)} commandes")
     except Exception as e:
-        print(f"Erreur lors de l'export des commandes: {e}")
+        print(f"[✘] Erreur export Google Sheet: {e}")
 
 
 WILAYA_CHOICES = [
@@ -306,8 +314,6 @@ WILAYA_CHOICES = [
 class Commande(models.Model):
     id_commande = models.AutoField(primary_key=True)
     date_commande = models.DateField(default=now)
-    produit_commandé = models.ForeignKey("Products.Variant", related_name="produit_commandé", on_delete=models.SET_NULL, null=True)
-    quantite_commandé = models.IntegerField(default=1)
     etat_commande = models.CharField(
         max_length=30,
         choices=[
@@ -317,8 +323,8 @@ class Commande(models.Model):
         ],
         default="En attente",
     )
-    nom_client = models.CharField(max_length=100, blank=False, null=False)
-    numero_client = models.CharField(max_length=15, blank=False, null=False)
+    nom_client = models.CharField(max_length=100)
+    numero_client = models.CharField(max_length=15)
     prix_total = models.DecimalField(max_digits=10, decimal_places=0, default=0)
     type_livraison = models.CharField(
         max_length=30,
@@ -329,43 +335,42 @@ class Commande(models.Model):
         default="Bureau",
     )
     Adresse_livraison = models.CharField(max_length=255, blank=True, null=True)
-    wilaya = models.CharField(max_length=100, choices=WILAYA_CHOICES, default='Alger', blank=False, null=False)
+    wilaya = models.CharField(max_length=100, choices=WILAYA_CHOICES, default='Alger')
     commune = models.CharField(max_length=255, blank=True, null=True)
-    Bureau_Yalidine = models.CharField(max_length=255, blank=True, null=True,default=None, help_text="Bureau Yalidine pour livraison en bureau")
-    Bureau_ZD = models.CharField(max_length=255, blank=True, null=True,default=None, help_text="Bureau ZD pour livraison en bureau")
+    Bureau_Yalidine = models.CharField(max_length=255, blank=True, null=True, default=None)
+    Bureau_ZD = models.CharField(max_length=255, blank=True, null=True, default=None)
 
     class Meta:
-        # Add database indexes for better performance
-        indexes = [
-            models.Index(fields=['-id_commande']),  # For ordering by ID desc
-        ]
-        # Default ordering: latest first
+        indexes = [models.Index(fields=['-id_commande'])]
         ordering = ['-id_commande']
 
     def save(self, *args, **kwargs):
         is_new = self.pk is None
-        variant = self.produit_commandé
-        if is_new and variant:
-            variant.quantite -= self.quantite_commandé
-            variant.save()
-        elif not is_new and variant:
-            old_commande = Commande.objects.get(pk=self.pk)
-            if old_commande.produit_commandé != variant or old_commande.quantite_commandé != self.quantite_commandé:
-                if old_commande.produit_commandé and old_commande.produit_commandé != variant:
-                    old_commande.produit_commandé.quantite += old_commande.quantite_commandé
-                    old_commande.produit_commandé.save()
-
-                if old_commande.produit_commandé == variant:
-                    variant.quantite += old_commande.quantite_commandé
-                variant.quantite -= self.quantite_commandé
-                variant.save()
-
         super().save(*args, **kwargs)
 
         if is_new:
             append_commande_to_sheet(self)
         else:
             update_commande_on_sheet(self)
+
+
+
+class ProduitCommande(models.Model):
+    commande = models.ForeignKey("Commande", on_delete=models.CASCADE, related_name="produits")
+    produit = models.ForeignKey(Produit, on_delete=models.CASCADE)
+    couleur = models.ForeignKey(Couleur, on_delete=models.CASCADE)
+    taille = models.ForeignKey(Taille, on_delete=models.CASCADE)
+    quantite = models.PositiveIntegerField()
+
+    class Meta:
+        unique_together = ('commande', 'produit', 'couleur', 'taille')
+
+    def get_variant(self):
+        return Variant.objects.filter(
+            produit=self.produit,
+            couleur=self.couleur,
+            taille=self.taille
+        ).first()
 
 
 

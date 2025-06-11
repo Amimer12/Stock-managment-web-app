@@ -559,15 +559,6 @@
                 </select>
             </div>
 
-            <div class="form-group">
-                <label for="boutique_id">Filtrer par boutique :</label>
-                <select name="boutique_id" id="boutique_id" required>
-                    <option value="all" selected>Toutes les boutiques</option>
-                    {% for boutique in boutiques %}
-                        <option value="{{ boutique.id_boutique }}">{{ boutique.nom_boutique }}</option>
-                    {% endfor %}
-                </select>
-            </div>
 
             <button type="submit" class="download-btn">
                 📥 Télécharger Commandes

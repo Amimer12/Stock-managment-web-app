@@ -26,8 +26,7 @@ def telechargement_sheet_view(request):
             return download_integration_sheet(request, boutique_id)
         elif action_type == 'download_commandes':
             etat_commande = request.POST.get('etat_commande')
-            boutique_id = request.POST.get('boutique_id')
-            return download_commandes_sheet(request, etat_commande, boutique_id)
+            return download_commandes_sheet(request, etat_commande)
 
      # Get all boutiques for the select dropdown
     boutiques = Boutique.objects.all().order_by('nom_boutique')
@@ -198,7 +197,7 @@ def verify_commandes_sheet(request):
     return redirect('integration_sheet')
 
 
-def download_commandes_sheet(request, etat_commande=None, boutique_id=None):
+def download_commandes_sheet(request, etat_commande=None):
     output = io.BytesIO()
     workbook = xlsxwriter.Workbook(output, {'in_memory': True})
     worksheet = workbook.add_worksheet('Commandes')
@@ -211,74 +210,84 @@ def download_commandes_sheet(request, etat_commande=None, boutique_id=None):
     # Headers
     headers = [
         'ID Commande', 'Date Commande', 'Produit Commandé', 'SKU',
-        'Boutique', 'Couleur de produit', 'Taille de produit', 'Quantité Commandée',
-        'État Commande', 'Nom Client', 'Numéro Client', 'Prix Total',
-        'Type Livraison', 'Adresse Livraison', 'Wilaya', 'Commune',"Bureau Yalidine", "Bureau ZD"
+        'Boutique', 'État Commande', 'Nom Client', 'Numéro Client', 'Prix Total',
+        'Type Livraison', 'Adresse Livraison', 'Wilaya', 'Commune',
+        "Bureau Yalidine", "Bureau ZD"
     ]
     for col, header in enumerate(headers):
         worksheet.write(0, col, header, header_format)
 
-    # Build query
-    commandes = Commande.objects.select_related(
-        'produit_commandé', 'produit_commandé__produit', 'produit_commandé__produit__boutique'
+    # Build queryset
+    commandes = Commande.objects.prefetch_related(
+        'produits__produit', 'produits__couleur', 'produits__taille', 'produits__produit__boutique'
     ).order_by('-date_commande')
 
     if etat_commande and etat_commande != 'all':
         commandes = commandes.filter(etat_commande=etat_commande)
 
-    if boutique_id and boutique_id != 'all':
-        commandes = commandes.filter(produit_commandé__produit__boutique__id_boutique=boutique_id)
+    print(f"[DEBUG] Loaded {commandes.count()} commandes")
 
-    # Write data
     row = 1
     for cmd in commandes:
-        produit = cmd.produit_commandé.produit
-        couleur = cmd.produit_commandé.couleur.nom_couleur
-        taille = cmd.produit_commandé.taille.nom_taille
-        sku = cmd.produit_commandé.SKU if cmd.produit_commandé.SKU else 'N/A'
-        boutique_name = produit.boutique.nom_boutique
+        produits = list(cmd.produits.all())
+
+        if produits:
+            produits_str = ", ".join([
+                f"{p.produit.nom_produit}-{p.couleur.nom_couleur}-{p.taille.nom_taille} (x{p.quantite})"
+                for p in produits
+            ])
+
+            skus = []
+            for p in produits:
+                variant = p.get_variant()
+                skus.append(variant.SKU if variant and variant.SKU else "N/A")
+            skus = ", ".join(skus)
+
+            boutique_name = produits[0].produit.boutique.nom_boutique if produits[0].produit.boutique else "N/A"
+
+        else:
+            print(f"[DEBUG] Commande {cmd.id_commande} has no ProduitCommande")
+            produits_str = "Aucun produit"
+            skus = "N/A"
+            boutique_name = "N/A"
+
+        print(f"[DEBUG] Writing commande {cmd.id_commande}: {produits_str}")
 
         worksheet.write(row, 0, cmd.id_commande, cell_format)
         worksheet.write_datetime(row, 1, cmd.date_commande, date_format)
-        worksheet.write(row, 2, produit.nom_produit, cell_format)
-        worksheet.write(row, 3, sku, cell_format)
+        worksheet.write(row, 2, produits_str, cell_format)
+        worksheet.write(row, 3, skus, cell_format)
         worksheet.write(row, 4, boutique_name, cell_format)
-        worksheet.write(row, 5, couleur, cell_format)
-        worksheet.write(row, 6, taille, cell_format)
-        worksheet.write(row, 7, cmd.quantite_commandé, cell_format)
-        worksheet.write(row, 8, cmd.etat_commande, cell_format)
-        worksheet.write(row, 9, cmd.nom_client, cell_format)
-        worksheet.write(row, 10, cmd.numero_client, cell_format)
-        worksheet.write(row, 11, f"{float(cmd.prix_total)} DZD", cell_format)
-        worksheet.write(row, 12, cmd.type_livraison, cell_format)
-        worksheet.write(row, 13, cmd.Adresse_livraison or '', cell_format)
-        worksheet.write(row, 14, cmd.wilaya, cell_format)
-        worksheet.write(row, 15, cmd.commune or '', cell_format)
-        worksheet.write(row, 16, cmd.Bureau_Yalidine or '', cell_format)
-        worksheet.write(row, 17, cmd.Bureau_ZD or '', cell_format)
+        worksheet.write(row, 5, cmd.etat_commande, cell_format)
+        worksheet.write(row, 6, cmd.nom_client, cell_format)
+        worksheet.write(row, 7, cmd.numero_client, cell_format)
+        worksheet.write(row, 8, f"{float(cmd.prix_total)} DZD", cell_format)
+        worksheet.write(row, 9, cmd.type_livraison, cell_format)
+        worksheet.write(row, 10, cmd.Adresse_livraison or '', cell_format)
+        worksheet.write(row, 11, cmd.wilaya, cell_format)
+        worksheet.write(row, 12, cmd.commune or '', cell_format)
+        worksheet.write(row, 13, cmd.Bureau_Yalidine or '', cell_format)
+        worksheet.write(row, 14, cmd.Bureau_ZD or '', cell_format)
         row += 1
 
     # Column widths
     worksheet.set_column('A:A', 12)
     worksheet.set_column('B:B', 15)
-    worksheet.set_column('C:C', 25)
+    worksheet.set_column('C:C', 45)  # Produits
     worksheet.set_column('D:D', 25)  # SKU
     worksheet.set_column('E:E', 20)  # Boutique
     worksheet.set_column('F:F', 15)
-    worksheet.set_column('G:G', 15)
-    worksheet.set_column('H:H', 15)
-    worksheet.set_column('I:I', 15)
-    worksheet.set_column('J:J', 20)
-    worksheet.set_column('K:K', 20)
+    worksheet.set_column('G:G', 20)
+    worksheet.set_column('H:H', 20)
+    worksheet.set_column('I:I', 25)
+    worksheet.set_column('J:J', 15)
+    worksheet.set_column('K:K', 25)
     worksheet.set_column('L:L', 25)
-    worksheet.set_column('M:M', 15)
+    worksheet.set_column('M:M', 25)
     worksheet.set_column('N:N', 25)
     worksheet.set_column('O:O', 25)
-    worksheet.set_column('P:P', 25)
-    worksheet.set_column('Q:Q', 25)  # Bureau Yalidine
-    worksheet.set_column('R:R', 25)  # Bureau ZD
 
-    # Return file
+    # Return response
     workbook.close()
     output.seek(0)
     response = HttpResponse(
@@ -287,8 +296,5 @@ def download_commandes_sheet(request, etat_commande=None, boutique_id=None):
     )
 
     suffix = f"_{etat_commande}" if etat_commande and etat_commande != 'all' else "_tous_etats"
-    if boutique_id and boutique_id != 'all':
-        suffix += f"_boutique_{boutique_id}"
-
     response['Content-Disposition'] = f'attachment; filename="commandes_sheet{suffix}.xlsx"'
     return response

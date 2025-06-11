@@ -1,7 +1,9 @@
 from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
-from .models import Commande
+from .models import Commande,ProduitCommande
 from Orders.google_sheets import get_sheets_service
+from django.db.models.signals import post_save, pre_delete
+from django.dispatch import receiver
 
 @receiver(pre_delete, sender=Commande)
 def handle_commande_delete(sender, instance, **kwargs):
@@ -9,11 +11,24 @@ def handle_commande_delete(sender, instance, **kwargs):
     Handle commande deletion - called BEFORE the commande is actually deleted
     """
     commande_id = instance.id_commande
+    try:
+        success = delete_commande_from_sheet(commande_id)
+        if success:
+            print(f"✓ Removed commande {commande_id} from Google Sheet")
+        else:
+            print(f"⚠ Could not remove commande {commande_id} from Google Sheet")
+    except Exception as e:
+        print(f"✗ Error removing commande {commande_id} from Google Sheet: {e}")
 
-    if instance.produit_commandé:
-        instance.produit_commandé.quantite += instance.quantite_commandé
-        instance.produit_commandé.save()
-    print(f"Restored stock for produit {instance.produit_commandé} after deleting commande {commande_id}")
+@receiver(pre_delete, sender=ProduitCommande)
+def restore_stock_on_delete(sender, instance, **kwargs):
+    variant = instance.get_variant()
+    if variant:
+        variant.quantite += instance.quantite
+        variant.save()
+
+    commande_id = instance.commande.id_commande if instance.commande else None
+    print(f"Restored stock for produit {variant} after deleting ligne of commande {commande_id}")
     
     try:
         success = delete_commande_from_sheet(commande_id)
@@ -22,7 +37,44 @@ def handle_commande_delete(sender, instance, **kwargs):
         else:
             print(f"⚠ Could not remove commande {commande_id} from Google Sheet")
     except Exception as e:
-        print(f"✗ Error removing commande {instance.id_commande} from Google Sheet: {e}")
+        print(f"✗ Error removing commande {commande_id} from Google Sheet: {e}")
+
+
+import threading
+from django.db.models.signals import pre_save, post_save, pre_delete
+from django.dispatch import receiver
+
+_local = threading.local()
+
+def get_old_quantities():
+    if not hasattr(_local, 'old_quantities'):
+        _local.old_quantities = {}
+    return _local.old_quantities
+
+@receiver(pre_save, sender=ProduitCommande)
+def cache_old_quantity(sender, instance, **kwargs):
+    if instance.pk:
+        try:
+            old_instance = ProduitCommande.objects.get(pk=instance.pk)
+            get_old_quantities()[instance.pk] = old_instance.quantite
+        except ProduitCommande.DoesNotExist:
+            pass
+
+@receiver(post_save, sender=ProduitCommande)
+def update_variant_stock(sender, instance, created, **kwargs):
+    variant = instance.get_variant()
+    if not variant:
+        return
+
+    if created:
+        variant.quantite -= instance.quantite
+    else:
+        old_q = get_old_quantities().pop(instance.pk, 0)
+        delta = instance.quantite - old_q
+        variant.quantite -= delta
+
+    variant.save()
+
 
 
 # utils.py (move your Google Sheets functions here)

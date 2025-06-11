@@ -1,23 +1,59 @@
 from django.contrib import admin
-from .models import Commande
+from .models import Commande, ProduitCommande
 from .forms import CommandeForm
 from Products.models import Variant, Produit
 from Gestionnaires.models import Gestionnaire
 from django.urls import path
 from django.http import JsonResponse
+from django import forms
+
+class ProduitCommandeInlineForm(forms.ModelForm):
+    class Meta:
+        model = ProduitCommande
+        fields = ['produit', 'couleur', 'taille', 'quantite']
+
+    def clean(self):
+        cleaned_data = super().clean()
+        produit = cleaned_data.get("produit")
+        couleur = cleaned_data.get("couleur")
+        taille = cleaned_data.get("taille")
+        quantite = cleaned_data.get("quantite")
+
+        # Skip validation for empty rows
+        if not (produit or couleur or taille or quantite):
+            return cleaned_data  # Do nothing
+
+        if not (produit and couleur and taille):
+            raise forms.ValidationError("Veuillez sélectionner un produit, une couleur et une taille.")
+
+        try:
+            variant = Variant.objects.get(produit=produit, couleur=couleur, taille=taille)
+        except Variant.DoesNotExist:
+            raise forms.ValidationError("Aucun variant correspondant pour cette combinaison.")
+
+        if quantite is not None and quantite > variant.quantite:
+            raise forms.ValidationError(f"Stock insuffisant. Disponible : {variant.quantite}")
+
+        return cleaned_data
+
+
+
+class ProduitCommandeInline(admin.TabularInline):
+    model = ProduitCommande
+    form = ProduitCommandeInlineForm
+    extra = 0
+
 
 
 @admin.register(Commande)
 class CommandeAdmin(admin.ModelAdmin):
-    form = CommandeForm
-    list_display = ('id_commande_display','date_commande', 'etat_commande', 'get_display_variant','prix_total_dzd',)
-    search_fields = ('etat_commande', 'nom_client', 'numero_client', 'produit_commandé__produit__nom_produit')
-    list_filter = ('etat_commande','date_commande', 'produit_commandé__produit','produit_commandé__couleur','produit_commandé__taille', 'type_livraison', 'wilaya')
+    inlines = [ProduitCommandeInline]
+    list_display = ('id_commande_display', 'date_commande', 'etat_commande', 'prix_total_dzd',)
+    search_fields = ('etat_commande', 'nom_client', 'numero_client', 'lignes__variant__produit__nom_produit')
+    list_filter = ('etat_commande','date_commande', 'type_livraison', 'wilaya')
     ordering = ('-date_commande',)
+    form = CommandeForm
     fieldsets = [
-        ('Détails de produit', {
-            'fields': ['produit', 'couleur', 'taille', 'quantite_commandé']
-        }),
         ('Details de commande', {
             'fields': ['date_commande', 'etat_commande']
         }),
@@ -30,30 +66,15 @@ class CommandeAdmin(admin.ModelAdmin):
         ('Detail de client', {
             'fields': ['nom_client', 'numero_client']
         }),
-]
+    ]
 
     def id_commande_display(self, obj):
         return f"Cmd #{obj.id_commande}"
     id_commande_display.short_description = 'ID Commande'
-    def get_display_variant(self, obj):
-        return f"{obj.produit_commandé.produit.nom_produit} - {obj.produit_commandé.couleur.nom_couleur} - {obj.produit_commandé.taille.nom_taille}" if obj.produit_commandé else "Aucun produit"
-    get_display_variant.short_description = 'Produit commandé'
 
     def prix_total_dzd(self, obj):
         return f"{obj.prix_total} DZD"
     prix_total_dzd.short_description = 'Prix Total (DZD)'
-
-    def get_form(self, request, obj=None, **kwargs):
-        form = super().get_form(request, obj, **kwargs)
-        user = request.user
-        gestionnaire = Gestionnaire.objects.filter(user=user).first()
-        if hasattr(user, 'groups') and user.groups.filter(name="Gestionnaire").exists():
-            boutiques = gestionnaire.boutique.all()
-            produits = Produit.objects.filter(boutique__in=boutiques)
-            form.base_fields['produit_commandé'].queryset = Variant.objects.filter(
-                produit__in=produits
-            ).distinct()
-        return form
     
     def get_urls(self):
         urls = super().get_urls()
