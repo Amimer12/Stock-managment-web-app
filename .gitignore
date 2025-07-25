@@ -1,2 +1,6 @@
 ./virtual_env
 Orders/token.pickle
+Orders/google_sheets.py
+project_GS/.env
+./db.sqlite3
+./email_info.txt
