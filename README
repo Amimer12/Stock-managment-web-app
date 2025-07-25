@@ -1,10 +1,26 @@
-python -m venv virtual_env
-virtual_env/Scripts/activate
-cd project_GS
-python manage.py runserver
+# Inventory Management System (Gestion de Stock)
 
+This is a **Django-based Inventory Management System** with a custom **Jazzmin-admin interface**. The application helps manage stock levels and account-specific data with an integrated feature to link and interact with **Excel sheet files**.
 
-required packages:
+## 🔧 Features
+
+- User-friendly Django Admin Panel customized with **Jazzmin**.
+- Manage stock items, accounts, and transactions.
+- Export and link data to **Excel sheets** (.xlsx) for a selected account.
+- Clean and modern UI for managing inventory efficiently.
+
+## 📁 Project Structure
+
+- `project_GS/` — Main Django project folder.
+- `virtual_env/` — Python virtual environment.
+
+## ✅ Requirements
+
+Make sure you have **Python 3.8+** installed.
+
+Install the required Python packages:
+
+```bash
 pip install django
 pip install xlsxwriter
 pip install pandas openpyxl
