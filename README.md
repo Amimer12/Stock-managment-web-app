@@ -50,13 +50,13 @@ Run the development server:
 ```bash
 python manage.py runserver
 ```
-📊 Excel Integration Feature
+## 📊 Excel Integration Feature
 A key feature of this application is the ability to link and synchronize data for a selected account with an Excel sheet (.xlsx). This allows easy data export, backup, and integration with reporting tools.
 
-🎨 Admin UI Customization
+## 🎨 Admin UI Customization
 The project uses Jazzmin to enhance the default Django admin interface with a modern and responsive design, improving usability and visual appeal.
 
-☁️ Deployment
+## ☁️ Deployment
 Web Hosting: Render
 
 Database: Neon – A serverless PostgreSQL platform.
